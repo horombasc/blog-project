@@ -1,0 +1,66 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+header {
+    background: #333;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+}
+
+nav a, header a {
+    color: white;
+    margin: 0 1rem;
+    text-decoration: none;
+}
+
+section {
+    padding: 2rem;
+    border-bottom: 1px solid #ddd;
+}
+
+h2 {
+    color: #333;
+}
+
+textarea, input, select {
+    width: 100%;
+    max-width: 400px;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+}
+
+button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #555;
+}
+
+#photoGallery img {
+    max-width: 200px;
+    margin: 0.5rem;
+}
+
+#postList, #newsList, #commentList {
+    margin-top: 1rem;
+}
+
+footer {
+    text-align: center;
+    padding: 1rem;
+    background: #f4f4f4;
+}

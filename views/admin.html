@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - My Blog</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Admin Panel</h1>
+        <a href="/">Back to Blog</a>
+    </header>
+
+    <section>
+        <h2>Admin Login</h2>
+        <input type="password" id="adminPassword" placeholder="Enter admin password">
+        <button onclick="login()">Login</button>
+        <p id="loginMessage"></p>
+    </section>
+
+    <section id="adminContent" style="display: none;">
+        <h2>Upload Family Photos</h2>
+        <form id="photoForm">
+            <input type="file" name="photos" accept="image/*" multiple>
+            <button type="submit">Upload Photos</button>
+        </form>
+
+        <h2>Write a Post</h2>
+        <form id="postForm">
+            <input type="text" name="title" placeholder="Post Title" required>
+            <textarea name="content" placeholder="Post Content" required></textarea>
+            <select name="category">
+                <option value="blog">Blog Post</option>
+                <option value="news">Local News</option>
+            </select>
+            <button type="submit">Add Post</button>
+        </form>
+    </section>
+
+    <footer>
+        <p>© 2025 My Personal Blog</p>
+    </footer>
+
+    <script>
+        let adminPassword = null;
+
+        function login() {
+            adminPassword = document.getElementById('adminPassword').value;
+            document.getElementById('adminContent').style.display = 'block';
+            document.getElementById('loginMessage').textContent = 'Logged in!';
+            setupForms();
+        }
+
+        function setupForms() {
+            document.getElementById('photoForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const res = await fetch('/api/photos', {
+                    method: 'POST',
+                    headers: { 'Authorization': adminPassword },
+                    body: formData
+                });
+                if (res.ok) alert('Photos uploaded!');
+                else alert('Upload failed. Check password.');
+            };
+
+            document.getElementById('postForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                const res = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': adminPassword,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    alert('Post added!');
+                    e.target.reset();
+                } else {
+                    alert('Post failed. Check password.');
+                }
+            };
+        }
+    </script>
+</body>
+</html>

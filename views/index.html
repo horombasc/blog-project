@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Personal Blog</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>My Personal Blog</h1>
+        <nav>
+            <a href="#photos">Photos</a>
+            <a href="#about">About</a>
+            <a href="#posts">Posts</a>
+            <a href="#news">Local News</a>
+            <a href="#comments">Comments</a>
+        </nav>
+    </header>
+
+    <section id="photos">
+        <h2>Family Photos</h2>
+        <div id="photoGallery"></div>
+    </section>
+
+    <section id="about">
+        <h2>About Me</h2>
+        <p>Hi, I'm [Your Name]! This blog is a space where I share my family moments, thoughts, and local happenings.</p>
+    </section>
+
+    <section id="posts">
+        <h2>Blog Posts</h2>
+        <div id="postList"></div>
+    </section>
+
+    <section id="news">
+        <h2>Local News</h2>
+        <div id="newsList"></div>
+    </section>
+
+    <section id="comments">
+        <h2>Comments</h2>
+        <textarea id="commentInput" placeholder="Leave a comment..."></textarea>
+        <button onclick="addComment()">Submit Comment</button>
+        <div id="commentList"></div>
+    </section>
+
+    <section id="subscription">
+        <h2>Subscribe</h2>
+        <input type="email" id="emailInput" placeholder="Enter your email">
+        <button onclick="subscribe()">Subscribe</button>
+        <p id="subscriptionMessage"></p>
+    </section>
+
+    <footer>
+        <p>© 2025 My Personal Blog</p>
+    </footer>
+
+    <script src="/js/script.js"></script>
+</body>
+</html>
