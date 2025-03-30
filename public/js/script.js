@@ -20,7 +20,7 @@ window.onload = async () => {
         else if (post.category === 'news') newsList.innerHTML += html;
     });
 
-    // Load comments
+    // Load approved comments
     const commentRes = await fetch('/api/comments');
     const comments = await commentRes.json();
     const commentList = document.getElementById('commentList');
@@ -37,7 +37,7 @@ async function addComment() {
         });
         if (res.ok) {
             document.getElementById('commentInput').value = '';
-            window.location.reload(); // Refresh to show new comment
+            alert('Comment submitted for approval!');
         }
     }
 }
@@ -56,3 +56,20 @@ async function subscribe() {
         }
     }
 }
+
+document.getElementById('contactForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (res.ok) {
+        document.getElementById('contactMessage').textContent = 'Message sent! Thank you!';
+        e.target.reset();
+    } else {
+        document.getElementById('contactMessage').textContent = 'Failed to send message.';
+    }
+};

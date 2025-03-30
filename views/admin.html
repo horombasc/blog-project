@@ -25,6 +25,7 @@
             <input type="file" name="photos" accept="image/*" multiple>
             <button type="submit">Upload Photos</button>
         </form>
+        <div id="photoList"></div>
 
         <h2>Write a Post</h2>
         <form id="postForm">
@@ -36,6 +37,13 @@
             </select>
             <button type="submit">Add Post</button>
         </form>
+        <div id="postList"></div>
+
+        <h2>Moderate Comments</h2>
+        <div id="pendingComments"></div>
+
+        <h2>Contact Messages</h2>
+        <div id="contactList"></div>
     </section>
 
     <footer>
@@ -50,6 +58,7 @@
             document.getElementById('adminContent').style.display = 'block';
             document.getElementById('loginMessage').textContent = 'Logged in!';
             setupForms();
+            loadAdminContent();
         }
 
         function setupForms() {
@@ -61,8 +70,12 @@
                     headers: { 'Authorization': adminPassword },
                     body: formData
                 });
-                if (res.ok) alert('Photos uploaded!');
-                else alert('Upload failed. Check password.');
+                if (res.ok) {
+                    alert('Photos uploaded!');
+                    loadPhotos();
+                } else {
+                    alert('Upload failed. Check password.');
+                }
             };
 
             document.getElementById('postForm').onsubmit = async (e) => {
@@ -80,10 +93,110 @@
                 if (res.ok) {
                     alert('Post added!');
                     e.target.reset();
+                    loadPosts();
                 } else {
                     alert('Post failed. Check password.');
                 }
             };
+        }
+
+        async function loadAdminContent() {
+            loadPhotos();
+            loadPosts();
+            loadPendingComments();
+            loadContacts();
+        }
+
+        async function loadPhotos() {
+            const res = await fetch('/api/photos', { headers: { 'Authorization': adminPassword } });
+            const photos = await res.json();
+            const photoList = document.getElementById('photoList');
+            photoList.innerHTML = photos.map(p => `
+                <div>
+                    <img src="/images/${p.filename}" style="max-width: 100px;">
+                    <button onclick="deletePhoto(${p.id})">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function loadPosts() {
+            const res = await fetch('/api/posts', { headers: { 'Authorization': adminPassword } });
+            const posts = await res.json();
+            const postList = document.getElementById('postList');
+            postList.innerHTML = posts.map(p => `
+                <div>
+                    <h3>${p.title}</h3>
+                    <p>${p.content}</p>
+                    <small>${p.date} (${p.category})</small>
+                    <button onclick="deletePost(${p.id})">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function loadPendingComments() {
+            const res = await fetch('/api/comments/pending', { headers: { 'Authorization': adminPassword } });
+            const comments = await res.json();
+            const commentList = document.getElementById('pendingComments');
+            commentList.innerHTML = comments.map(c => `
+                <div>
+                    <p>${c.content} <small>${c.date}</small></p>
+                    <button onclick="approveComment(${c.id})">Approve</button>
+                    <button onclick="deleteComment(${c.id})">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function loadContacts() {
+            const res = await fetch('/api/contacts', { headers: { 'Authorization': adminPassword } });
+            const contacts = await res.json();
+            const contactList = document.getElementById('contactList');
+            contactList.innerHTML = contacts.map(c => `
+                <div>
+                    <p><strong>${c.name}</strong> (${c.email}): ${c.message} <small>${c.date}</small></p>
+                </div>
+            `).join('');
+        }
+
+        async function deletePhoto(id) {
+            if (confirm('Delete this photo?')) {
+                const res = await fetch(`/api/photos/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': adminPassword }
+                });
+                if (res.ok) loadPhotos();
+                else alert('Delete failed.');
+            }
+        }
+
+        async function deletePost(id) {
+            if (confirm('Delete this post?')) {
+                const res = await fetch(`/api/posts/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': adminPassword }
+                });
+                if (res.ok) loadPosts();
+                else alert('Delete failed.');
+            }
+        }
+
+        async function approveComment(id) {
+            const res = await fetch(`/api/comments/approve/${id}`, {
+                method: 'POST',
+                headers: { 'Authorization': adminPassword }
+            });
+            if (res.ok) loadPendingComments();
+            else alert('Approval failed.');
+        }
+
+        async function deleteComment(id) {
+            if (confirm('Delete this comment?')) {
+                const res = await fetch(`/api/comments/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': adminPassword }
+                });
+                if (res.ok) loadPendingComments();
+                else alert('Delete failed.');
+            }
         }
     </script>
 </body>

@@ -28,11 +28,19 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT,
-        date TEXT
+        date TEXT,
+        approved INTEGER DEFAULT 0
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        message TEXT,
+        date TEXT
     )`);
 });
 
@@ -45,8 +53,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Admin password (hashed for security)
-const adminPasswordHash = bcrypt.hashSync('admin123', 10); // Change 'admin123' to your password
+// Admin password
+const adminPasswordHash = bcrypt.hashSync('admin123', 10); // Update to your password
 
 // Middleware to check admin access
 function checkAdmin(req, res, next) {
@@ -58,18 +66,10 @@ function checkAdmin(req, res, next) {
     }
 }
 
-// Routes
-// Public blog page
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'index.html'));
-});
+// Public Routes
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'views', 'admin.html')));
 
-// Admin page
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'admin.html'));
-});
-
-// Get all posts (public)
 app.get('/api/posts', (req, res) => {
     db.all('SELECT * FROM posts ORDER BY date DESC', (err, rows) => {
         if (err) return res.status(500).send('Database error');
@@ -77,7 +77,6 @@ app.get('/api/posts', (req, res) => {
     });
 });
 
-// Get all photos (public)
 app.get('/api/photos', (req, res) => {
     db.all('SELECT * FROM photos', (err, rows) => {
         if (err) return res.status(500).send('Database error');
@@ -85,15 +84,13 @@ app.get('/api/photos', (req, res) => {
     });
 });
 
-// Get all comments (public)
 app.get('/api/comments', (req, res) => {
-    db.all('SELECT * FROM comments ORDER BY date DESC', (err, rows) => {
+    db.all('SELECT * FROM comments WHERE approved = 1 ORDER BY date DESC', (err, rows) => {
         if (err) return res.status(500).send('Database error');
         res.json(rows);
     });
 });
 
-// Add a comment (public)
 app.post('/api/comments', (req, res) => {
     const { content } = req.body;
     const date = new Date().toISOString();
@@ -103,7 +100,6 @@ app.post('/api/comments', (req, res) => {
     });
 });
 
-// Subscribe (public)
 app.post('/api/subscribe', (req, res) => {
     const { email } = req.body;
     db.run('INSERT OR IGNORE INTO subscriptions (email) VALUES (?)', [email], (err) => {
@@ -112,7 +108,17 @@ app.post('/api/subscribe', (req, res) => {
     });
 });
 
-// Admin: Add a post
+app.post('/api/contact', (req, res) => {
+    const { name, email, message } = req.body;
+    const date = new Date().toISOString();
+    db.run('INSERT INTO contacts (name, email, message, date) VALUES (?, ?, ?, ?)', 
+        [name, email, message, date], (err) => {
+        if (err) return res.status(500).send('Database error');
+        res.json({ success: true });
+    });
+});
+
+// Admin Routes
 app.post('/api/posts', checkAdmin, (req, res) => {
     const { title, content, category } = req.body;
     const date = new Date().toISOString();
@@ -123,7 +129,14 @@ app.post('/api/posts', checkAdmin, (req, res) => {
     });
 });
 
-// Admin: Upload photos
+app.delete('/api/posts/:id', checkAdmin, (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM posts WHERE id = ?', [id], (err) => {
+        if (err) return res.status(500).send('Database error');
+        res.json({ success: true });
+    });
+});
+
 app.post('/api/photos', checkAdmin, upload.array('photos', 10), (req, res) => {
     const files = req.files;
     files.forEach(file => {
@@ -132,6 +145,51 @@ app.post('/api/photos', checkAdmin, upload.array('photos', 10), (req, res) => {
         });
     });
     res.json({ success: true });
+});
+
+app.delete('/api/photos/:id', checkAdmin, (req, res) => {
+    const { id } = req.params;
+    db.get('SELECT filename FROM photos WHERE id = ?', [id], (err, row) => {
+        if (err || !row) return res.status(500).send('Database error');
+        const fs = require('fs');
+        fs.unlink(path.join(__dirname, 'public', 'images', row.filename), (err) => {
+            if (err) console.error(err);
+            db.run('DELETE FROM photos WHERE id = ?', [id], (err) => {
+                if (err) return res.status(500).send('Database error');
+                res.json({ success: true });
+            });
+        });
+    });
+});
+
+app.get('/api/comments/pending', checkAdmin, (req, res) => {
+    db.all('SELECT * FROM comments WHERE approved = 0 ORDER BY date DESC', (err, rows) => {
+        if (err) return res.status(500).send('Database error');
+        res.json(rows);
+    });
+});
+
+app.post('/api/comments/approve/:id', checkAdmin, (req, res) => {
+    const { id } = req.params;
+    db.run('UPDATE comments SET approved = 1 WHERE id = ?', [id], (err) => {
+        if (err) return res.status(500).send('Database error');
+        res.json({ success: true });
+    });
+});
+
+app.delete('/api/comments/:id', checkAdmin, (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM comments WHERE id = ?', [id], (err) => {
+        if (err) return res.status(500).send('Database error');
+        res.json({ success: true });
+    });
+});
+
+app.get('/api/contacts', checkAdmin, (req, res) => {
+    db.all('SELECT * FROM contacts ORDER BY date DESC', (err, rows) => {
+        if (err) return res.status(500).send('Database error');
+        res.json(rows);
+    });
 });
 
 // Start server
