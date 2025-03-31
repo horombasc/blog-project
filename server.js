@@ -45,6 +45,18 @@ db.serialize(() => {
     )`);
 });
 
+// Add approved column if missing
+db.run(`ALTER TABLE comments ADD COLUMN approved INTEGER DEFAULT 0`, (err) => {
+    if (err && err.message.includes('duplicate column')) {
+        console.log('Approved column already exists');
+    } else if (err) {
+        console.error('Error adding approved column:', err.message);
+    } else {
+        console.log('Added approved column to comments table');
+    }
+});
+
+
 // File upload setup
 const storage = multer.diskStorage({
     destination: './public/images/',
