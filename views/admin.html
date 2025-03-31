@@ -65,7 +65,6 @@
         }
 
         function setupForms() {
-            // Initialize TinyMCE
             tinymce.init({
                 selector: '#postContent',
                 plugins: 'lists',
@@ -74,7 +73,7 @@
                 height: 300,
                 setup: (editor) => {
                     editor.on('init', () => {
-                        editor.setContent(''); // Clear on load
+                        editor.setContent('');
                     });
                 }
             });
@@ -98,8 +97,9 @@
             document.getElementById('postForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const title = document.querySelector('#postForm input[name="title"]').value;
-                const content = tinymce.get('postContent').getContent(); // Get TinyMCE content
+                const content = tinymce.get('postContent')?.getContent() || '';
                 const category = document.querySelector('#postForm select[name="category"]').value;
+                console.log('Submitting post:', { title, content, category });
                 const res = await fetch('/api/posts', {
                     method: 'POST',
                     headers: { 
@@ -108,13 +108,16 @@
                     },
                     body: JSON.stringify({ title, content, category })
                 });
+                console.log('Response status:', res.status);
                 if (res.ok) {
                     alert('Post added!');
                     document.querySelector('#postForm input[name="title"]').value = '';
-                    tinymce.get('postContent').setContent(''); // Clear editor
+                    tinymce.get('postContent').setContent('');
                     loadPosts();
                 } else {
-                    alert('Post failed. Check password.');
+                    const errorText = await res.text();
+                    console.error('Post failed:', res.status, errorText);
+                    alert(`Post failed: ${res.status} - ${errorText}`);
                 }
             };
         }
