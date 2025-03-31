@@ -127,7 +127,7 @@
                 <div>
                     <h3>${p.title}</h3>
                     <p>${p.content}</p>
-                    <small>${p.date} (${p.category})</small>
+                    <small>${formatDate(p.date)} (${p.category})</small>
                     <button onclick="deletePost(${p.id})">Delete</button>
                 </div>
             `).join('');
@@ -145,14 +145,13 @@
                     return;
                 }
                 const comments = await res.json();
-                console.log('Pending comments:', comments);
                 const commentList = document.getElementById('pendingComments');
                 if (comments.length === 0) {
                     commentList.innerHTML = '<p>No pending comments.</p>';
                 } else {
                     commentList.innerHTML = comments.map(c => `
                         <div>
-                            <p>${c.content} <small>${c.date}</small></p>
+                            <p>${c.content} <small>${formatDate(c.date)}</small></p>
                             <button onclick="approveComment(${c.id})">Approve</button>
                             <button onclick="deleteComment(${c.id})">Delete</button>
                         </div>
@@ -160,7 +159,7 @@
                 }
             } catch (error) {
                 console.error('Error in loadPendingComments:', error);
-                document.getElementById('pendingComments').innerHTML = '<p>Failed to load comments. Check console for details.</p>';
+                document.getElementById('pendingComments').innerHTML = '<p>Failed to load comments.</p>';
             }
         }
 
@@ -170,7 +169,7 @@
             const contactList = document.getElementById('contactList');
             contactList.innerHTML = contacts.map(c => `
                 <div>
-                    <p><strong>${c.name}</strong> (${c.email}): ${c.message} <small>${c.date}</small></p>
+                    <p><strong>${c.name}</strong> (${c.email}): ${c.message} <small>${formatDate(c.date)}</small></p>
                 </div>
             `).join('');
         }
@@ -202,11 +201,8 @@
                 method: 'POST',
                 headers: { 'Authorization': adminPassword }
             });
-            if (res.ok) {
-                loadPendingComments();
-            } else {
-                alert('Approval failed.');
-            }
+            if (res.ok) loadPendingComments();
+            else alert('Approval failed.');
         }
 
         async function deleteComment(id) {
@@ -215,12 +211,14 @@
                     method: 'DELETE',
                     headers: { 'Authorization': adminPassword }
                 });
-                if (res.ok) {
-                    loadPendingComments();
-                } else {
-                    alert('Delete failed.');
-                }
+                if (res.ok) loadPendingComments();
+                else alert('Delete failed.');
             }
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
         }
     </script>
 </body>
