@@ -12,8 +12,8 @@ app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Database setup (use persistent disk if configured)
-const db = new sqlite3.Database('/opt/render/project/src/database/database.sqlite' || 'database.sqlite');
+// Database setup
+const db = new sqlite3.Database('database.sqlite'); // Reverted to default path
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,13 +43,14 @@ db.serialize(() => {
         message TEXT,
         date TEXT
     )`);
-    // Ensure approved column exists
     db.run(`ALTER TABLE comments ADD COLUMN approved INTEGER DEFAULT 0`, (err) => {
         if (err && err.message.includes('duplicate column')) console.log('Approved column already exists');
         else if (err) console.error('Error adding approved column:', err.message);
         else console.log('Added approved column');
     });
 });
+
+// [Rest of your server.js code remains unchanged]
 
 // File upload setup
 const storage = multer.diskStorage({
