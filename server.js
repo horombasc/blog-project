@@ -192,7 +192,10 @@ app.delete('/api/photos/:id', checkAdmin, (req, res) => {
 
 app.get('/api/comments/pending', checkAdmin, (req, res) => {
     db.all('SELECT * FROM comments WHERE approved = 0 ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
+        if (err) {
+            console.error('Database error in /api/comments/pending:', err.message);
+            return res.status(500).send('Database error');
+        }
         res.json(rows);
     });
 });
