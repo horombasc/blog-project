@@ -110,8 +110,8 @@ app.get('/api/photos', (req, res) => {
     });
 });
 
-app.get('/api/comments', (req, res) => {
-    db.all('SELECT * FROM comments WHERE approved = 1 ORDER BY date DESC', (err, rows) => {
+app.get('/api/comments/pending', checkAdmin, (req, res) => {
+    db.all('SELECT * FROM comments WHERE approved = 0 ORDER BY date DESC', (err, rows) => {
         if (err) return res.status(500).send('Database error');
         res.json(rows);
     });

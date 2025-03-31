@@ -198,6 +198,21 @@
                 else alert('Delete failed.');
             }
         }
+
+        async function loadPendingComments() {
+    const res = await fetch('/api/comments/pending', { headers: { 'Authorization': adminPassword } });
+    if (!res.ok) console.error('Fetch failed:', res.status, await res.text());
+    const comments = await res.json();
+    console.log('Pending comments:', comments); // Debug output
+    const commentList = document.getElementById('pendingComments');
+    commentList.innerHTML = comments.map(c => `
+        <div>
+            <p>${c.content} <small>${c.date}</small></p>
+            <button onclick="approveComment(${c.id})">Approve</button>
+            <button onclick="deleteComment(${c.id})">Delete</button>
+        </div>
+    `).join('');
+}
     </script>
 </body>
 </html>
