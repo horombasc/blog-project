@@ -59,6 +59,17 @@ button:hover {
     margin-top: 1rem;
 }
 
+/* New styles for formatted content */
+#postList div, #newsList div {
+    margin-bottom: 1rem;
+}
+#postList ul, #newsList ul {
+    padding-left: 20px;
+}
+#postList p, #newsList p {
+    margin: 0.5rem 0;
+}
+
 footer {
     text-align: center;
     padding: 1rem;

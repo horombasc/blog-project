@@ -15,7 +15,7 @@ window.onload = async () => {
     const postList = document.getElementById('postList');
     const newsList = document.getElementById('newsList');
     posts.forEach(post => {
-        const html = `<h3>${post.title}</h3><p>${post.content}</p><small>${formatDate(post.date)}</small>`;
+        const html = `<h3>${post.title}</h3><div>${post.content}</div><small>${formatDate(post.date)}</small>`;
         if (post.category === 'blog') postList.innerHTML += html;
         else if (post.category === 'news') newsList.innerHTML += html;
     });
@@ -85,4 +85,4 @@ document.getElementById('contactForm').onsubmit = async (e) => {
 function formatDate(isoString) {
     const date = new Date(isoString);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-};
+}

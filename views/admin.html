@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - My Blog</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <!-- TinyMCE CDN -->
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body>
     <header>
@@ -30,7 +32,7 @@
         <h2>Write a Post</h2>
         <form id="postForm">
             <input type="text" name="title" placeholder="Post Title" required>
-            <textarea name="content" placeholder="Post Content" required></textarea>
+            <textarea name="content" id="postContent" placeholder="Post Content" required></textarea>
             <select name="category">
                 <option value="blog">Blog Post</option>
                 <option value="news">Local News</option>
@@ -62,6 +64,20 @@
         }
 
         function setupForms() {
+            // Initialize TinyMCE
+            tinymce.init({
+                selector: '#postContent',
+                plugins: 'lists',
+                toolbar: 'undo redo | bold italic | alignleft aligncenter alignright | bullist numlist',
+                menubar: false,
+                height: 300,
+                setup: (editor) => {
+                    editor.on('init', () => {
+                        editor.setContent(''); // Clear on load
+                    });
+                }
+            });
+
             document.getElementById('photoForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
@@ -80,19 +96,21 @@
 
             document.getElementById('postForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData);
+                const title = document.querySelector('#postForm input[name="title"]').value;
+                const content = tinymce.get('postContent').getContent(); // Get TinyMCE content
+                const category = document.querySelector('#postForm select[name="category"]').value;
                 const res = await fetch('/api/posts', {
                     method: 'POST',
                     headers: { 
                         'Authorization': adminPassword,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({ title, content, category })
                 });
                 if (res.ok) {
                     alert('Post added!');
-                    e.target.reset();
+                    document.querySelector('#postForm input[name="title"]').value = '';
+                    tinymce.get('postContent').setContent(''); // Clear editor
                     loadPosts();
                 } else {
                     alert('Post failed. Check password.');
@@ -126,7 +144,7 @@
             postList.innerHTML = posts.map(p => `
                 <div>
                     <h3>${p.title}</h3>
-                    <p>${p.content}</p>
+                    <div>${p.content}</div>
                     <small>${formatDate(p.date)} (${p.category})</small>
                     <button onclick="deletePost(${p.id})">Delete</button>
                 </div>
