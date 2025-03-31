@@ -3,6 +3,7 @@ const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 const path = require('path');
 const app = express();
 
@@ -56,6 +57,15 @@ const upload = multer({ storage });
 // Admin password
 const adminPasswordHash = bcrypt.hashSync('admin123', 10); // Update to your password
 
+// Email setup (replace with your Gmail credentials)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'collinhoromba@gmail.com', // Your Gmail
+        pass: 'hzqzmculutnrsgov'             // App-specific password (see below)
+    }
+});
+
 // Middleware to check admin access
 function checkAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -63,6 +73,22 @@ function checkAdmin(req, res, next) {
         next();
     } else {
         res.status(401).send('Unauthorized');
+    }
+}
+
+// Function to send email
+async function sendEmail(subject, text) {
+    const mailOptions = {
+        from: 'YOUR_GMAIL_ADDRESS@gmail.com',
+        to: 'collinhoromba@gmail.com', // Where you want to receive notifications
+        subject: subject,
+        text: text
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('Email sent:', subject);
+    } catch (error) {
+        console.error('Email error:', error);
     }
 }
 
@@ -96,6 +122,7 @@ app.post('/api/comments', (req, res) => {
     const date = new Date().toISOString();
     db.run('INSERT INTO comments (content, date) VALUES (?, ?)', [content, date], (err) => {
         if (err) return res.status(500).send('Database error');
+        sendEmail('New Comment on Your Blog', `Content: ${content}\nDate: ${date}`);
         res.json({ success: true });
     });
 });
@@ -114,6 +141,7 @@ app.post('/api/contact', (req, res) => {
     db.run('INSERT INTO contacts (name, email, message, date) VALUES (?, ?, ?, ?)', 
         [name, email, message, date], (err) => {
         if (err) return res.status(500).send('Database error');
+        sendEmail('New Contact Message', `Name: ${name}\nEmail: ${email}\nMessage: ${message}\nDate: ${date}`);
         res.json({ success: true });
     });
 });
