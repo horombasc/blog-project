@@ -1,5 +1,4 @@
 window.onload = async () => {
-    // Load photos
     const photoRes = await fetch('/api/photos');
     const photos = await photoRes.json();
     const gallery = document.getElementById('photoGallery');
@@ -9,7 +8,6 @@ window.onload = async () => {
         gallery.appendChild(img);
     });
 
-    // Load posts
     const postRes = await fetch('/api/posts');
     const posts = await postRes.json();
     const postList = document.getElementById('postList');
@@ -20,19 +18,11 @@ window.onload = async () => {
         else if (post.category === 'news') newsList.innerHTML += html;
     });
 
-    // Load approved comments
-    try {
-        const commentRes = await fetch('/api/comments');
-        if (!commentRes.ok) throw new Error('Failed to fetch comments');
-        const comments = await commentRes.json();
-        const commentList = document.getElementById('commentList');
-        commentList.innerHTML = comments.length > 0 
-            ? comments.map(c => `<p>${c.content} <small>${formatDate(c.date)}</small></p>`).join('')
-            : '<p>No approved comments yet.</p>';
-    } catch (error) {
-        console.error('Error loading comments:', error);
-        document.getElementById('commentList').innerHTML = '<p>Error loading comments.</p>';
-    }
+    const commentRes = await fetch('/api/comments');
+    const comments = await commentRes.json();
+    document.getElementById('commentList').innerHTML = comments.length > 0 
+        ? comments.map(c => `<p>${c.content} <small>${formatDate(c.date)}</small></p>`).join('')
+        : '<p>No approved comments yet.</p>';
 };
 
 async function addComment() {

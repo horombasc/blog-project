@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - My Blog</title>
     <link rel="stylesheet" href="/css/styles.css">
-    <!-- TinyMCE CDN -->
-    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
-    <script src="https://cdn.tiny.cloud/1/ku1ccouns9do9xnbzctzbkx3cfjt1qrvbg0ubx1yuqzxmnt7/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>
+    <script src="https://cdn.tiny.cloud/1/ku1ccouns9do9xnbzctzbkx3cfjt1qrvbg0ubx1yuqzxmnt7/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body>
     <header>
@@ -58,6 +56,7 @@
 
         function login() {
             adminPassword = document.getElementById('adminPassword').value;
+            console.log('Admin password set to:', adminPassword);
             document.getElementById('adminContent').style.display = 'block';
             document.getElementById('loginMessage').textContent = 'Logged in!';
             setupForms();
@@ -74,6 +73,7 @@
                 setup: (editor) => {
                     editor.on('init', () => {
                         editor.setContent('');
+                        console.log('TinyMCE initialized');
                     });
                 }
             });
@@ -90,7 +90,8 @@
                     alert('Photos uploaded!');
                     loadPhotos();
                 } else {
-                    alert('Upload failed. Check password.');
+                    const errorText = await res.text();
+                    alert(`Upload failed: ${res.status} - ${errorText}`);
                 }
             };
 
@@ -108,7 +109,6 @@
                     },
                     body: JSON.stringify({ title, content, category })
                 });
-                console.log('Response status:', res.status);
                 if (res.ok) {
                     alert('Post added!');
                     document.querySelector('#postForm input[name="title"]').value = '';
@@ -116,7 +116,6 @@
                     loadPosts();
                 } else {
                     const errorText = await res.text();
-                    console.error('Post failed:', res.status, errorText);
                     alert(`Post failed: ${res.status} - ${errorText}`);
                 }
             };
@@ -132,8 +131,7 @@
         async function loadPhotos() {
             const res = await fetch('/api/photos', { headers: { 'Authorization': adminPassword } });
             const photos = await res.json();
-            const photoList = document.getElementById('photoList');
-            photoList.innerHTML = photos.map(p => `
+            document.getElementById('photoList').innerHTML = photos.map(p => `
                 <div>
                     <img src="/images/${p.filename}" style="max-width: 100px;">
                     <button onclick="deletePhoto(${p.id})">Delete</button>
@@ -144,8 +142,7 @@
         async function loadPosts() {
             const res = await fetch('/api/posts', { headers: { 'Authorization': adminPassword } });
             const posts = await res.json();
-            const postList = document.getElementById('postList');
-            postList.innerHTML = posts.map(p => `
+            document.getElementById('postList').innerHTML = posts.map(p => `
                 <div>
                     <h3>${p.title}</h3>
                     <div>${p.content}</div>
@@ -156,40 +153,28 @@
         }
 
         async function loadPendingComments() {
-            try {
-                const res = await fetch('/api/comments/pending', { 
-                    headers: { 'Authorization': adminPassword } 
-                });
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    console.error(`Fetch failed: ${res.status} - ${errorText}`);
-                    document.getElementById('pendingComments').innerHTML = `<p>Error loading comments: ${res.status} - ${errorText}</p>`;
-                    return;
-                }
-                const comments = await res.json();
-                const commentList = document.getElementById('pendingComments');
-                if (comments.length === 0) {
-                    commentList.innerHTML = '<p>No pending comments.</p>';
-                } else {
-                    commentList.innerHTML = comments.map(c => `
-                        <div>
-                            <p>${c.content} <small>${formatDate(c.date)}</small></p>
-                            <button onclick="approveComment(${c.id})">Approve</button>
-                            <button onclick="deleteComment(${c.id})">Delete</button>
-                        </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Error in loadPendingComments:', error);
-                document.getElementById('pendingComments').innerHTML = '<p>Failed to load comments.</p>';
+            const res = await fetch('/api/comments/pending', { headers: { 'Authorization': adminPassword } });
+            if (!res.ok) {
+                const errorText = await res.text();
+                document.getElementById('pendingComments').innerHTML = `<p>Error: ${res.status} - ${errorText}</p>`;
+                return;
             }
+            const comments = await res.json();
+            document.getElementById('pendingComments').innerHTML = comments.length === 0 
+                ? '<p>No pending comments.</p>'
+                : comments.map(c => `
+                    <div>
+                        <p>${c.content} <small>${formatDate(c.date)}</small></p>
+                        <button onclick="approveComment(${c.id})">Approve</button>
+                        <button onclick="deleteComment(${c.id})">Delete</button>
+                    </div>
+                `).join('');
         }
 
         async function loadContacts() {
             const res = await fetch('/api/contacts', { headers: { 'Authorization': adminPassword } });
             const contacts = await res.json();
-            const contactList = document.getElementById('contactList');
-            contactList.innerHTML = contacts.map(c => `
+            document.getElementById('contactList').innerHTML = contacts.map(c => `
                 <div>
                     <p><strong>${c.name}</strong> (${c.email}): ${c.message} <small>${formatDate(c.date)}</small></p>
                 </div>
