@@ -4,6 +4,7 @@ const multer = require('multer');
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fs = require('fs'); // Added for directory creation
 const app = express();
 
 // Middleware
@@ -11,8 +12,24 @@ app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Database setup (use persistent disk if configured on Render)
-const db = new sqlite3.Database('/opt/render/project/src/database/database.sqlite' || 'database.sqlite');
+// Ensure database directory exists (for Render persistent disk)
+const dbDir = '/opt/render/project/src/database';
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+    console.log('Created database directory:', dbDir);
+}
+
+// Database setup
+const dbPath = path.join(dbDir, 'database.sqlite');
+console.log('Database path:', dbPath); // Debug
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Database connection error:', err.message);
+    } else {
+        console.log('Connected to SQLite database');
+    }
+});
+
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +71,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Admin password (plain text for simplicity)
+// Admin password
 const adminPassword = 'admin123';
 
 // Email setup
@@ -84,7 +101,7 @@ async function sendEmail(subject, text) {
 // Middleware to check admin access
 function checkAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
-    console.log('Checking auth - Header:', authHeader); // Debug
+    console.log('Checking auth - Header:', authHeader);
     if (authHeader === adminPassword) {
         console.log('Auth successful');
         next();
@@ -179,7 +196,6 @@ app.delete('/api/photos/:id', checkAdmin, (req, res) => {
     const { id } = req.params;
     db.get('SELECT filename FROM photos WHERE id = ?', [id], (err, row) => {
         if (err || !row) return res.status(500).send('Database error');
-        const fs = require('fs');
         fs.unlink(path.join(__dirname, 'public', 'images', row.filename), (err) => {
             if (err) console.error('Error deleting photo file:', err.message);
             db.run('DELETE FROM photos WHERE id = ?', [id], (err) => {
