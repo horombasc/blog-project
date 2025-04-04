@@ -38,16 +38,34 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// SQLite Database Setup
+// SQLite Database Setup with Fallback
 const dbDir = '/db';
 const dbPath = path.join(dbDir, 'database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error connecting to SQLite:', err);
-    return;
-  }
-  console.log('Connected to SQLite database at:', dbPath);
-});
+let db;
+
+try {
+  // Check if the directory is accessible
+  fs.accessSync(dbDir, fs.constants.W_OK);
+  console.log(`Directory ${dbDir} is writable`);
+  
+  db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+      console.error('Error connecting to SQLite at', dbPath, ':', err);
+      return;
+    }
+    console.log('Connected to SQLite database at:', dbPath);
+  });
+} catch (err) {
+  console.error('Cannot access or write to', dbDir, ':', err);
+  console.warn('Falling back to in-memory SQLite database (data will not persist)');
+  db = new sqlite3.Database(':memory:', (err) => {
+    if (err) {
+      console.error('Error creating in-memory SQLite database:', err);
+      process.exit(1);
+    }
+    console.log('Connected to in-memory SQLite database');
+  });
+}
 
 // Check if the posts table exists and migrate if necessary
 db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (err, row) => {
