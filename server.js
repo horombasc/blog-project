@@ -29,7 +29,7 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
   }
 
   if (row) {
-    // Check if the image column exists
+    // Check the existing columns in the posts table
     db.all("PRAGMA table_info(posts)", (err, columns) => {
       if (err) {
         console.error('Error checking table schema:', err);
@@ -37,9 +37,12 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
       }
 
       const hasImageColumn = Array.isArray(columns) && columns.some(col => col.name === 'image');
-      if (!hasImageColumn) {
-        console.log('Migrating posts table to add image column...');
-        // Step 1: Create a new table with the image column
+      const hasTypeColumn = Array.isArray(columns) && columns.some(col => col.name === 'type');
+
+      if (!hasImageColumn || !hasTypeColumn) {
+        console.log('Migrating posts table to add missing columns (image and/or type)...');
+
+        // Step 1: Create a new table with the full schema
         db.run(`
           CREATE TABLE posts_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,12 +63,28 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
             return;
           }
 
-          // Step 2: Copy data from the old table to the new table (image will be NULL for existing rows)
-          db.run(`
-            INSERT INTO posts_new (id, title, content, type, categories, tags, createdAt, author, likes, comments)
-            SELECT id, title, content, type, categories, tags, createdAt, author, likes, comments
+          // Step 2: Build the migration query dynamically based on existing columns
+          const existingColumns = columns.map(col => col.name);
+          const targetColumns = ['id', 'title', 'content', 'type', 'categories', 'tags', 'createdAt', 'author', 'likes', 'comments'];
+          const selectColumns = targetColumns.map(col => {
+            if (existingColumns.includes(col)) {
+              return col; // Use the column if it exists
+            } else if (col === 'type') {
+              return "'Blog' AS type"; // Default to 'Blog' if type is missing
+            } else if (col === 'image') {
+              return "NULL AS image"; // Default to NULL if image is missing
+            } else {
+              return `'' AS ${col}`; // Default to empty string for other missing columns
+            }
+          });
+
+          const insertQuery = `
+            INSERT INTO posts_new (${targetColumns.join(', ')})
+            SELECT ${selectColumns.join(', ')}
             FROM posts
-          `, (err) => {
+          `;
+
+          db.run(insertQuery, (err) => {
             if (err) {
               console.error('Error copying data to posts_new:', err);
               return;
@@ -84,13 +103,13 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
                   console.error('Error renaming posts_new to posts:', err);
                   return;
                 }
-                console.log('Successfully migrated posts table with image column');
+                console.log('Successfully migrated posts table with missing columns');
               });
             });
           });
         });
       } else {
-        console.log('Image column already exists in posts table');
+        console.log('All required columns (image, type) already exist in posts table');
       }
     });
   } else {
