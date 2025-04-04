@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - My Blog</title>
+    <link rel="stylesheet" href="/public/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Admin Header -->
+    <header class="admin-header">
+        <div class="header-container">
+            <h1><a href="/">My Blog Admin</a></h1>
+            <nav>
+                <ul>
+                    <li><a href="/">Back to Blog</a></li>
+                    <li><a href="#" id="logout-btn">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Admin Dashboard -->
+    <main class="admin-main">
+        <div class="admin-container">
+            <aside class="admin-sidebar">
+                <ul>
+                    <li><a href="#content-management" class="active">Content Management</a></li>
+                    <li><a href="#user-management">User Management</a></li>
+                    <li><a href="#theme-plugins">Theme & Plugins</a></li>
+                    <li><a href="#settings">Settings</a></li>
+                </ul>
+            </aside>
+            <section class="admin-content">
+                <!-- Content Management -->
+                <div id="content-management" class="admin-section active">
+                    <h2>Content Management</h2>
+                    <!-- Post Creation/Editing -->
+                    <div class="admin-subsection">
+                        <h3>Create/Edit Post</h3>
+                        <form id="post-form">
+                            <label for="post-title">Title:</label>
+                            <input type="text" id="post-title" required>
+                            <label for="post-content">Content:</label>
+                            <textarea id="post-content" required></textarea>
+                            <label for="post-image">Featured Image URL:</label>
+                            <input type="text" id="post-image" placeholder="e.g., https://i.imgur.com/example.jpg">
+                            <label for="post-type">Post Type:</label>
+                            <select id="post-type" required>
+                                <option value="Blog">Blog (Personal Thoughts)</option>
+                                <option value="News">News (Community Updates)</option>
+                            </select>
+                            <label for="post-categories">Additional Categories:</label>
+                            <input type="text" id="post-categories" placeholder="e.g., Events, Tech">
+                            <label for="post-tags">Tags:</label>
+                            <input type="text" id="post-tags" placeholder="e.g., community, reflection">
+                            <button type="submit">Save Post</button>
+                        </form>
+                    </div>
+                    <!-- Page Management -->
+                    <div class="admin-subsection">
+                        <h3>Manage Pages</h3>
+                        <ul id="page-list">
+                            <li>About <button class="edit-btn">Edit</button> <button class="delete-btn">Delete</button></li>
+                            <li>Contact <button class="edit-btn">Edit</button> <button class="delete-btn">Delete</button></li>
+                        </ul>
+                        <button id="add-page-btn">Add New Page</button>
+                    </div>
+                    <!-- Category and Tag Management -->
+                    <div class="admin-subsection">
+                        <h3>Categories & Tags</h3>
+                        <form id="category-form">
+                            <input type="text" placeholder="New Category" id="new-category">
+                            <button type="submit">Add Category</button>
+                        </form>
+                        <ul id="category-list">
+                            <li>Events <button class="delete-btn">Delete</button></li>
+                            <li>Tech <button class="delete-btn">Delete</button></li>
+                        </ul>
+                    </div>
+                    <!-- Comment Management -->
+                    <div class="admin-subsection">
+                        <h3>Comments</h3>
+                        <ul id="comment-list">
+                            <li>"Great update!" - User1 <button class="approve-btn">Approve</button> <button class="delete-btn">Delete</button></li>
+                        </ul>
+                    </div>
+                    <!-- Media Library -->
+                    <div class="admin-subsection">
+                        <h3>Media Library</h3>
+                        <input type="text" id="media-url" placeholder="Enter image URL">
+                        <button id="add-media-btn">Add Media</button>
+                        <ul id="media-list">
+                            <li>https://i.imgur.com/example.jpg <button class="delete-btn">Delete</button></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- User Management -->
+                <div id="user-management" class="admin-section">
+                    <h2>User Management</h2>
+                    <!-- User Roles -->
+                    <div class="admin-subsection">
+                        <h3>Users</h3>
+                        <ul id="user-list">
+                            <li>Jane (Admin) <button class="edit-role-btn">Edit Role</button></li>
+                            <li>Bob (Author) <button class="edit-role-btn">Edit Role</button></li>
+                        </ul>
+                        <button id="add-user-btn">Add User</button>
+                    </div>
+                    <!-- User Activity -->
+                    <div class="admin-subsection">
+                        <h3>User Activity</h3>
+                        <ul id="activity-log">
+                            <li>Jane created a post - April 3, 2025</li>
+                        </ul>
+                    </div>
+                </div>
+
+                # Theme and Plugin Management -->
+                <div id="theme-plugins" class="admin-section">
+                    <h2>Theme & Plugins</h2>
+                    <div class="admin-subsection">
+                        <h3>Theme</h3>
+                        <select id="theme-select">
+                            <option value="default">Default</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                        <button id="apply-theme-btn">Apply Theme</button>
+                    </div>
+                    <div class="admin-subsection">
+                        <h3>Plugins</h3>
+                        <ul id="plugin-list">
+                            <li>SEO Plugin <button class="toggle-plugin-btn">Deactivate</button></li>
+                        </ul>
+                        <button id="add-plugin-btn">Add Plugin</button>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div id="settings" class="admin-section">
+                    <h2>Settings</h2>
+                    <form id="settings-form">
+                        <label for="blog-title">Blog Title:</label>
+                        <input type="text" id="blog-title" value="My Blog">
+                        <label for="blog-desc">Description:</label>
+                        <input type="text" id="blog-desc" value="Community news and personal thoughts">
+                        <label for="posts-per-page">Posts Per Page:</label>
+                        <input type="number" id="posts-per-page" value="10" min="1">
+                        <label for="comment-moderation">Comment Moderation:</label>
+                        <select id="comment-moderation">
+                            <option value="manual">Manual</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                        <label for="two-factor">Two-Factor Authentication:</label>
+                        <input type="checkbox" id="two-factor">
+                        <button type="submit">Save Settings</button>
+                    </form>
+                    <div class="admin-subsection">
+                        <h3>Audit Logs</h3>
+                        <ul id="audit-log">
+                            <li>Settings updated - April 3, 2025</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/public/js/script.js"></script>
+</body>
+</html>

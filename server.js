@@ -1,243 +1,284 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const multer = require('multer');
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const path = require('path');
-const fs = require('fs'); // Added for directory creation
+
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Ensure database directory exists (for Render persistent disk)
-const dbDir = '/opt/render/project/src/database';
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log('Created database directory:', dbDir);
-}
-
-// Database setup
-const dbPath = path.join(dbDir, 'database.sqlite');
-console.log('Database path:', dbPath); // Debug
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Database connection error:', err.message);
-    } else {
-        console.log('Connected to SQLite database');
-    }
+// SQLite Database Setup
+const db = new sqlite3.Database('database.sqlite', (err) => {
+  if (err) {
+    console.error('Error connecting to SQLite:', err);
+    return;
+  }
+  console.log('Connected to SQLite database');
 });
 
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT,
-        content TEXT,
-        category TEXT,
-        date TEXT
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS photos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        filename TEXT
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        content TEXT,
-        date TEXT,
-        approved INTEGER DEFAULT 0
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS subscriptions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS contacts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        email TEXT,
-        message TEXT,
-        date TEXT
-    )`);
-    db.run(`ALTER TABLE comments ADD COLUMN approved INTEGER DEFAULT 0`, (err) => {
-        if (err && err.message.includes('duplicate column')) console.log('Approved column exists');
+// Create posts table if it doesn't exist
+db.run(`
+  CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    image TEXT,
+    type TEXT NOT NULL,
+    categories TEXT,
+    tags TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    author TEXT DEFAULT 'Jane Doe',
+    likes INTEGER DEFAULT 0,
+    comments TEXT DEFAULT '[]'
+  )
+`);
+
+// Seed initial data if the database is empty
+db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
+  if (err) {
+    console.error('Error checking posts:', err);
+    return;
+  }
+  if (row.count === 0) {
+    const initialPosts = [
+      {
+        title: 'Welcome to My Blog',
+        content: 'This is my first blog post! I’m excited to share my thoughts and community updates with you.',
+        image: 'https://via.placeholder.com/300x200',
+        type: 'Blog',
+        categories: JSON.stringify(['Welcome']),
+        tags: JSON.stringify(['intro']),
+        author: 'Jane Doe'
+      },
+      {
+        title: 'Community Festival Announced',
+        content: 'Join us for the annual community festival on May 15th! There will be food, music, and fun activities for all ages.',
+        image: 'https://via.placeholder.com/300x150',
+        type: 'News',
+        categories: JSON.stringify(['Events']),
+        tags: JSON.stringify(['festival']),
+        author: 'Jane Doe'
+      }
+    ];
+    const query = `
+      INSERT INTO posts (title, content, image, type, categories, tags, author)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    initialPosts.forEach(post => {
+      db.run(query, [
+        post.title,
+        post.content,
+        post.image,
+        post.type,
+        post.categories,
+        post.tags,
+        post.author
+      ], (err) => {
+        if (err) console.error('Error seeding post:', err);
+      });
     });
+    console.log('Seeded initial posts');
+  }
 });
 
-// File upload setup
-const storage = multer.diskStorage({
-    destination: './public/images/',
-    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
+// Serve frontend files
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
+app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
+app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'about.html')));
+app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'contact.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 
-// Admin password
-const adminPassword = 'admin123';
-
-// Email setup
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-async function sendEmail(subject, text) {
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_TO,
-        subject: subject,
-        text: text
-    };
-    try {
-        await transporter.sendMail(mailOptions);
-        console.log('Email sent:', subject);
-    } catch (error) {
-        console.error('Email error:', error);
-    }
-}
-
-// Middleware to check admin access
-function checkAdmin(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    console.log('Checking auth - Header:', authHeader);
-    if (authHeader === adminPassword) {
-        console.log('Auth successful');
-        next();
-    } else {
-        console.error('Auth failed - Header:', authHeader);
-        res.status(401).send('Unauthorized');
-    }
-}
-
-// Public Routes
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'views', 'admin.html')));
-
+// API Routes
+// Get all posts
 app.get('/api/posts', (req, res) => {
-    db.all('SELECT * FROM posts ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
-        res.json(rows);
+  const { type } = req.query;
+  const query = type ? 'SELECT * FROM posts WHERE type = ?' : 'SELECT * FROM posts';
+  const params = type ? [type] : [];
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    rows.forEach(row => {
+      row.categories = row.categories ? JSON.parse(row.categories) : [];
+      row.tags = row.tags ? JSON.parse(row.tags) : [];
+      row.comments = row.comments ? JSON.parse(row.comments) : [];
     });
+    res.json(rows);
+  });
 });
 
-app.get('/api/photos', (req, res) => {
-    db.all('SELECT * FROM photos', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
-        res.json(rows);
-    });
+// Get a single post by ID
+app.get('/api/posts/:id', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM posts WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!row) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    row.categories = row.categories ? JSON.parse(row.categories) : [];
+    row.tags = row.tags ? JSON.parse(row.tags) : [];
+    row.comments = row.comments ? JSON.parse(row.comments) : [];
+    res.json(row);
+  });
 });
 
-app.get('/api/comments', (req, res) => {
-    db.all('SELECT * FROM comments WHERE approved = 1 ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
-        res.json(rows);
-    });
+// Create a post
+app.post('/api/posts', (req, res) => {
+  const { title, content, image, type, categories, tags, author } = req.body;
+  const query = `
+    INSERT INTO posts (title, content, image, type, categories, tags, author)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
+  const params = [
+    title,
+    content,
+    image || null,
+    type,
+    JSON.stringify(categories ? JSON.parse(categories) : []),
+    JSON.stringify(tags ? JSON.parse(tags) : []),
+    author || 'Jane Doe'
+  ];
+  db.run(query, params, function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.status(201).json({ id: this.lastID, ...req.body, image, createdAt: new Date().toISOString() });
+  });
 });
 
-app.post('/api/comments', (req, res) => {
-    const { content } = req.body;
-    const date = new Date().toISOString();
-    db.run('INSERT INTO comments (content, date) VALUES (?, ?)', [content, date], (err) => {
-        if (err) return res.status(500).send('Database error');
-        sendEmail('New Comment', `Content: ${content}\nDate: ${date}`);
-        res.json({ success: true });
-    });
+// Update a post
+app.put('/api/posts/:id', (req, res) => {
+  const { id } = req.params;
+  const { title, content, image, type, categories, tags, author } = req.body;
+  const query = `
+    UPDATE posts
+    SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
+    WHERE id = ?
+  `;
+  const params = [
+    title,
+    content,
+    image,
+    type,
+    JSON.stringify(categories ? JSON.parse(categories) : []),
+    JSON.stringify(tags ? JSON.parse(tags) : []),
+    author || 'Jane Doe',
+    id
+  ];
+  db.run(query, params, function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (this.changes === 0) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ id, title, content, image, type, categories, tags, author });
+  });
 });
 
-app.post('/api/subscribe', (req, res) => {
-    const { email } = req.body;
-    db.run('INSERT OR IGNORE INTO subscriptions (email) VALUES (?)', [email], (err) => {
-        if (err) return res.status(500).send('Database error');
-        res.json({ success: true });
-    });
+// Delete a post
+app.delete('/api/posts/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM posts WHERE id = ?', [id], function (err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (this.changes === 0) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ message: 'Post deleted' });
+  });
 });
 
-app.post('/api/contact', (req, res) => {
-    const { name, email, message } = req.body;
-    const date = new Date().toISOString();
-    db.run('INSERT INTO contacts (name, email, message, date) VALUES (?, ?, ?, ?)', 
-        [name, email, message, date], (err) => {
-        if (err) return res.status(500).send('Database error');
-        sendEmail('New Contact', `Name: ${name}\nEmail: ${email}\nMessage: ${message}\nDate: ${date}`);
-        res.json({ success: true });
+// Like a post
+app.post('/api/posts/:id/like', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!row) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const newLikes = (row.likes || 0) + 1;
+    db.run('UPDATE posts SET likes = ? WHERE id = ?', [newLikes, id], function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id, likes: newLikes });
     });
+  });
 });
 
-// Admin Routes
-app.post('/api/posts', checkAdmin, (req, res) => {
-    const { title, content, category } = req.body;
-    const date = new Date().toISOString();
-    db.run('INSERT INTO posts (title, content, category, date) VALUES (?, ?, ?, ?)', 
-        [title, content, category, date], (err) => {
-        if (err) return res.status(500).send('Database error');
-        res.json({ success: true });
+// Unlike a post
+app.post('/api/posts/:id/unlike', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!row) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const newLikes = Math.max((row.likes || 0) - 1, 0);
+    db.run('UPDATE posts SET likes = ? WHERE id = ?', [newLikes, id], function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id, likes: newLikes });
     });
+  });
 });
 
-app.delete('/api/posts/:id', checkAdmin, (req, res) => {
-    const { id } = req.params;
-    db.run('DELETE FROM posts WHERE id = ?', [id], (err) => {
-        if (err) return res.status(500).send('Database error');
-        res.json({ success: true });
+// Add a comment
+app.post('/api/posts/:id/comment', (req, res) => {
+  const { id } = req.params;
+  const { content, author } = req.body;
+  db.get('SELECT comments FROM posts WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!row) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const comments = row.comments ? JSON.parse(row.comments) : [];
+    comments.push({ content, author, createdAt: new Date().toISOString() });
+    db.run('UPDATE posts SET comments = ? WHERE id = ?', [JSON.stringify(comments), id], function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id, comments });
     });
+  });
 });
 
-app.post('/api/photos', checkAdmin, upload.array('photos', 10), (req, res) => {
-    const files = req.files;
-    files.forEach(file => {
-        db.run('INSERT INTO photos (filename) VALUES (?)', [file.filename]);
-    });
-    res.json({ success: true });
-});
-
-app.delete('/api/photos/:id', checkAdmin, (req, res) => {
-    const { id } = req.params;
-    db.get('SELECT filename FROM photos WHERE id = ?', [id], (err, row) => {
-        if (err || !row) return res.status(500).send('Database error');
-        fs.unlink(path.join(__dirname, 'public', 'images', row.filename), (err) => {
-            if (err) console.error('Error deleting photo file:', err.message);
-            db.run('DELETE FROM photos WHERE id = ?', [id], (err) => {
-                if (err) return res.status(500).send('Database error');
-                res.json({ success: true });
-            });
-        });
-    });
-});
-
-app.get('/api/comments/pending', checkAdmin, (req, res) => {
-    db.all('SELECT * FROM comments WHERE approved = 0 ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
-        res.json(rows);
-    });
-});
-
-app.post('/api/comments/approve/:id', checkAdmin, (req, res) => {
-    const { id } = req.params;
-    db.run('UPDATE comments SET approved = 1 WHERE id = ?', [id], (err) => {
-        if (err) return res.status(500).send('Database error');
-        res.json({ success: true });
-    });
-});
-
-app.delete('/api/comments/:id', checkAdmin, (req, res) => {
-    const { id } = req.params;
-    db.run('DELETE FROM comments WHERE id = ?', [id], (err) => {
-        if (err) return res.status(500).send('Database error');
-        res.json({ success: true });
-    });
-});
-
-app.get('/api/contacts', checkAdmin, (req, res) => {
-    db.all('SELECT * FROM contacts ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).send('Database error');
-        res.json(rows);
-    });
-});
-
-// Start server
-const PORT = process.env.PORT || 3000;
+// Start Server
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
