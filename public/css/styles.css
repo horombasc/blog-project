@@ -1,4 +1,49 @@
-/* Reset default styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  
+  nav {
+    background-color: #333;
+    padding: 1rem;
+  }
+  
+  nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 1rem;
+  }
+  
+  nav ul li a {
+    color: white;
+    text-decoration: none;
+  }
+  
+  nav ul li a:hover {
+    text-decoration: underline;
+  }
+  
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  
+  .post {
+    border: 1px solid #ddd;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 5px;
+  }
+  
+  .post h2 {
+    margin-top: 0;
+  }
+
+/* Reset default styles 
 * {
     margin: 0;
     padding: 0;
@@ -12,7 +57,7 @@ body {
     background-color: #f4f4f4;
 }
 
-/* Header Styles */
+/* Header Styles *
 header {
     background-color: #fff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -70,7 +115,7 @@ nav a:hover::after {
     width: 100%;
 }
 
-/* Main Content Styles */
+/* Main Content Styles *
 .container {
     max-width: 1200px;
     margin: 0 auto;
@@ -165,7 +210,7 @@ nav a:hover::after {
     gap: 10px;
 }
 
-/* News Section Styles (inside article) */
+/* News Section Styles (inside article) *
 .news-section {
     margin: 0 15px 15px;
     padding: 10px;
@@ -244,7 +289,7 @@ nav a:hover::after {
     color: #e65a50;
 }
 
-/* News Page Styles */
+/* News Page Styles *
 .news-page {
     max-width: 1200px;
     margin: 20px auto;
@@ -319,7 +364,7 @@ nav a:hover::after {
     font-weight: bold;
 }
 
-/* Interaction Buttons */
+/* Interaction Buttons *
 .like-btn, .comment-btn, .share-btn {
     background: #f1f1f1;
     border: none;
@@ -351,7 +396,7 @@ nav a:hover::after {
     margin-top: 5px;
 }
 
-/* Sidebar Styles */
+/* Sidebar Styles *
 .sidebar {
     flex: 1;
     max-width: 300px;
@@ -470,7 +515,7 @@ nav a:hover::after {
     background: #0056b3;
 }
 
-/* About and Contact Pages */
+/* About and Contact Pages *
 .about-page, .contact-page {
     max-width: 800px;
     margin: 20px auto;
@@ -533,7 +578,7 @@ nav a:hover::after {
 }
 
 /* Footer Styles */
-footer {
+/*footer {
     background-color: #f8f9fa;
     padding: 20px;
     text-align: center;
@@ -545,7 +590,7 @@ footer {
     color: #666;
 }
 
-/* Admin Styles */
+/* Admin Styles *
 .admin-header {
     background-color: #333;
     color: #fff;
@@ -722,7 +767,7 @@ footer {
     border-bottom: 1px solid #eee;
 }
 
-/* Login Styles */
+/* Login Styles *
 .login-main {
     min-height: calc(100vh - 100px);
     display: flex;
@@ -790,7 +835,7 @@ footer {
     text-decoration: underline;
 }
 
-/* Latest News Section */
+/* Latest News Section *
 .latest-news {
     margin-bottom: 40px;
 }
@@ -842,7 +887,7 @@ footer {
     color: #666;
 }
 
-/* Full Post Page */
+/* Full Post Page *
 .full-post {
     padding: 20px 0;
 }
@@ -909,7 +954,7 @@ footer {
     border-radius: 5px;
 }
 
-/* Responsive Design for News Cards */
+/* Responsive Design for News Cards *
 @media (max-width: 768px) {
     .news-card {
         flex: 1 1 calc(50% - 20px);
@@ -922,7 +967,7 @@ footer {
     }
 }
 
-/* Responsive Design */
+/* Responsive Design *
 @media (max-width: 480px) {
     .login-container {
         padding: 20px;
@@ -930,7 +975,7 @@ footer {
     }
 }
 
-/* Responsive Design */
+/* Responsive Design *
 @media (max-width: 768px) {
     .admin-container {
         flex-direction: column;
@@ -940,7 +985,7 @@ footer {
     }
 }
 
-/* Responsive Design */
+/* Responsive Design *
 @media (max-width: 768px) {
     .container {
         flex-direction: column;
@@ -971,4 +1016,4 @@ footer {
         flex-direction: column;
         text-align: center;
     }
-}
+}*/

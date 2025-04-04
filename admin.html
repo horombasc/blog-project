@@ -1,135 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - My Blog</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" href="https://via.placeholder.com/32x32" sizes="32x32">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Blog Project</title>
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-    <header>
-        <nav>
-            <ul>
-                <li><a href="/">Home</a></li>
-                <li><a href="/news">News</a></li>
-                <li><a href="/about">About</a></li>
-                <li><a href="/contact">Contact</a></li>
-                <li><a href="/admin">Admin</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <h1>Admin - Create or Edit Post</h1>
-        <form id="post-form" enctype="multipart/form-data">
-            <input type="hidden" id="post-id" name="id">
-            <label for="title">Title:</label>
-            <input type="text" id="title" name="title" required>
-            <label for="content">Content:</label>
-            <textarea id="content" name="content" required></textarea>
-            <label for="image">Image:</label>
-            <input type="file" id="image" name="image" accept="image/*">
-            <label for="type">Post Type:</label>
-            <select id="type" name="type" required>
-                <option value="Blog">Blog</option>
-                <option value="News">News</option>
-            </select>
-            <label for="categories">Additional Categories (comma-separated):</label>
-            <input type="text" id="categories" name="categories">
-            <label for="tags">Tags (comma-separated):</label>
-            <input type="text" id="tags" name="tags">
-            <label for="author">Author:</label>
-            <input type="text" id="author" name="author" value="Jane Doe">
-            <button type="submit">Save Post</button>
-        </form>
-        <h2>Existing Posts</h2>
-        <div id="posts-list"></div>
-    </main>
-    <script>
-        const form = document.getElementById('post-form');
-        const postsList = document.getElementById('posts-list');
-    
-        // Load existing posts
-        fetch('/api/posts')
-            .then(res => res.json())
-            .then(posts => {
-                posts.forEach(post => {
-                    const postElement = document.createElement('div');
-                    postElement.innerHTML = `
-                        <h3>${post.title}</h3>
-                        <p>${post.content.substring(0, 100)}...</p>
-                        ${post.image ? `<img src="${post.image}" alt="${post.title}" style="max-width: 100px;">` : ''}
-                        <button onclick="editPost(${post.id})">Edit</button>
-                        <button onclick="deletePost(${post.id})">Delete</button>
-                    `;
-                    postsList.appendChild(postElement);
-                });
-            });
-    
-        // Handle form submission
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const formData = new FormData(form);
-            const postId = document.getElementById('post-id').value;
-            const url = postId ? `/api/posts/${postId}` : '/api/posts';
-            const method = postId ? 'PUT' : 'POST';
-    
-            fetch(url, {
-                method: method,
-                body: formData
-            })
-            .then(res => {
-                if (!res.ok) {
-                    return res.json().then(err => { throw new Error(err.error || 'Unknown error'); });
-                }
-                return res.json();
-            })
-            .then(data => {
-                alert(postId ? 'Post updated!' : 'Post created!');
-                window.location.reload();
-            })
-            .catch(err => {
-                console.error('Error saving post:', err);
-                alert('Error saving post: ' + err.message);
-            });
-        });
-    
-        function editPost(id) {
-            fetch(`/api/posts/${id}`)
-                .then(res => res.json())
-                .then(post => {
-                    document.getElementById('post-id').value = post.id;
-                    document.getElementById('title').value = post.title;
-                    document.getElementById('content').value = post.content;
-                    document.getElementById('type').value = post.type;
-                    document.getElementById('categories').value = post.categories.join(', ');
-                    document.getElementById('tags').value = post.tags.join(', ');
-                    document.getElementById('author').value = post.author;
-                    // Note: File input cannot be pre-filled for security reasons
-                });
-        }
-    
-        function deletePost(id) {
-            if (confirm('Are you sure you want to delete this post?')) {
-                fetch(`/api/posts/${id}`, { method: 'DELETE' })
-                    .then(res => {
-                        if (!res.ok) {
-                            return res.json().then(err => { throw new Error(err.error || 'Unknown error'); });
-                        }
-                        return res.json();
-                    })
-                    .then(() => {
-                        alert('Post deleted!');
-                        window.location.reload();
-                    })
-                    .catch(err => {
-                        console.error('Error deleting post:', err);
-                        alert('Error deleting post: ' + err.message);
-                    });
-            }
-        }
-    </script>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/news">News</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+      <li><a href="/admin">Admin</a></li>
+      <li><a href="/login">Login</a></li>
+    </ul>
+  </nav>
+  <div class="container">
+    <h1>Admin</h1>
+    <p>Admin panel to manage posts will be here.</p>
+  </div>
 </body>
 </html>
