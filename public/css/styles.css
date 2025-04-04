@@ -895,6 +895,20 @@ footer {
     font-size: 14px;
 }
 
+.post img {
+    max-width: 300px;
+    height: auto;
+    margin: 10px 0;
+    border-radius: 5px;
+}
+
+#post-container img {
+    max-width: 500px;
+    height: auto;
+    margin: 10px 0;
+    border-radius: 5px;
+}
+
 /* Responsive Design for News Cards */
 @media (max-width: 768px) {
     .news-card {

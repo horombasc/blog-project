@@ -118,13 +118,7 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
               return;
             }
 
-            db.run("UPDATE posts SET image = NULL WHERE image LIKE 'http%'", (err) => {
-              if (err) {
-                console.error('Error updating image URLs:', err);
-              } else {
-                console.log('Cleared external image URLs from posts');
-              }
-            });
+            
 
             // Step 3: Drop the old table
             db.run(`DROP TABLE posts`, (err) => {

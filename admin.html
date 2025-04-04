@@ -50,7 +50,7 @@
     <script>
         const form = document.getElementById('post-form');
         const postsList = document.getElementById('posts-list');
-
+    
         // Load existing posts
         fetch('/api/posts')
             .then(res => res.json())
@@ -67,7 +67,7 @@
                     postsList.appendChild(postElement);
                 });
             });
-
+    
         // Handle form submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -75,12 +75,17 @@
             const postId = document.getElementById('post-id').value;
             const url = postId ? `/api/posts/${postId}` : '/api/posts';
             const method = postId ? 'PUT' : 'POST';
-
+    
             fetch(url, {
                 method: method,
                 body: formData
             })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.error || 'Unknown error'); });
+                }
+                return res.json();
+            })
             .then(data => {
                 alert(postId ? 'Post updated!' : 'Post created!');
                 window.location.reload();
@@ -90,7 +95,7 @@
                 alert('Error saving post: ' + err.message);
             });
         });
-
+    
         function editPost(id) {
             fetch(`/api/posts/${id}`)
                 .then(res => res.json())
@@ -105,13 +110,23 @@
                     // Note: File input cannot be pre-filled for security reasons
                 });
         }
-
+    
         function deletePost(id) {
             if (confirm('Are you sure you want to delete this post?')) {
                 fetch(`/api/posts/${id}`, { method: 'DELETE' })
+                    .then(res => {
+                        if (!res.ok) {
+                            return res.json().then(err => { throw new Error(err.error || 'Unknown error'); });
+                        }
+                        return res.json();
+                    })
                     .then(() => {
                         alert('Post deleted!');
                         window.location.reload();
+                    })
+                    .catch(err => {
+                        console.error('Error deleting post:', err);
+                        alert('Error deleting post: ' + err.message);
                     });
             }
         }
