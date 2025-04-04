@@ -41,6 +41,7 @@ const upload = multer({
 const dbDir = '/db';
 const dbPath = path.join(dbDir, 'database.sqlite');
 let db;
+let isDbReady = false;
 
 // Promisify SQLite methods for better control
 const dbRun = (db, query, params = []) => {
@@ -72,39 +73,70 @@ const dbAll = (db, query, params = []) => {
 
 // Initialize the database with proper sequencing
 const initializeDatabase = async () => {
-  // Step 1: Set up the database connection
+  // Step 1: Ensure the /db directory exists
   try {
     await fs.access(dbDir, fs.constants.W_OK);
     console.log(`Directory ${dbDir} is writable`);
-    
-    db = await new Promise((resolve, reject) => {
-      const database = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          console.error('Error connecting to SQLite at', dbPath, ':', err);
-          reject(err);
-        } else {
-          console.log('Connected to SQLite database at:', dbPath);
-          resolve(database);
-        }
-      });
-    });
   } catch (err) {
-    console.error('Cannot access or write to', dbDir, ':', err);
-    console.warn('Falling back to in-memory SQLite database (data will not persist)');
-    db = await new Promise((resolve, reject) => {
-      const database = new sqlite3.Database(':memory:', (err) => {
-        if (err) {
-          console.error('Error creating in-memory SQLite database:', err);
-          reject(err);
-        } else {
-          console.log('Connected to in-memory SQLite database');
-          resolve(database);
-        }
-      });
-    });
+    if (err.code === 'ENOENT') {
+      console.log(`Directory ${dbDir} does not exist, creating it...`);
+      try {
+        await fs.mkdir(dbDir, { recursive: true });
+        console.log(`Created directory ${dbDir}`);
+      } catch (mkdirErr) {
+        console.error(`Failed to create directory ${dbDir}:`, mkdirErr);
+        throw mkdirErr;
+      }
+    } else {
+      console.error('Cannot access or write to', dbDir, ':', err);
+      throw err;
+    }
   }
 
-  // Step 2: Create or migrate the posts table
+  // Step 2: Set up the database connection with retries
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      db = await new Promise((resolve, reject) => {
+        const database = new sqlite3.Database(dbPath, (err) => {
+          if (err) {
+            console.error('Error connecting to SQLite at', dbPath, ':', err);
+            reject(err);
+          } else {
+            console.log('Connected to SQLite database at:', dbPath);
+            resolve(database);
+          }
+        });
+      });
+
+      // Verify the database file exists
+      await fs.access(dbPath, fs.constants.F_OK);
+      console.log(`Database file ${dbPath} exists and is accessible`);
+      break;
+    } catch (err) {
+      retries--;
+      if (retries === 0) {
+        console.error('Failed to connect to SQLite database after retries:', err);
+        console.warn('Falling back to in-memory SQLite database (data will not persist)');
+        db = await new Promise((resolve, reject) => {
+          const database = new sqlite3.Database(':memory:', (err) => {
+            if (err) {
+              console.error('Error creating in-memory SQLite database:', err);
+              reject(err);
+            } else {
+              console.log('Connected to in-memory SQLite database');
+              resolve(database);
+            }
+          });
+        });
+      } else {
+        console.log(`Retrying database connection (${retries} attempts left)...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  }
+
+  // Step 3: Create or migrate the posts table
   const tableExists = await dbGet(db, "SELECT name FROM sqlite_master WHERE type='table' AND name='posts'");
   if (!tableExists) {
     console.log('Creating posts table...');
@@ -176,7 +208,7 @@ const initializeDatabase = async () => {
     }
   }
 
-  // Step 3: Seed initial data if the database is empty
+  // Step 4: Seed initial data if the database is empty
   const { count } = await dbGet(db, 'SELECT COUNT(*) as count FROM posts') || { count: 0 };
   if (count === 0) {
     console.log('Seeding initial posts...');
@@ -219,6 +251,16 @@ const initializeDatabase = async () => {
   } else {
     console.log('Database already contains posts, skipping seeding');
   }
+
+  isDbReady = true;
+};
+
+// Middleware to check if the database is ready
+const checkDbReady = (req, res, next) => {
+  if (!isDbReady) {
+    return res.status(503).json({ error: 'Service unavailable: Database is still initializing' });
+  }
+  next();
 };
 
 // Start the server only after the database is initialized
@@ -242,8 +284,8 @@ initializeDatabase()
     app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
     app.get('/login.html', (req, res) => res.redirect('/login'));
 
-    // API Routes
-    app.get('/api/posts', async (req, res) => {
+    // API Routes with readiness check
+    app.get('/api/posts', checkDbReady, async (req, res) => {
       try {
         const { type } = req.query;
         const query = type ? 'SELECT * FROM posts WHERE type = ?' : 'SELECT * FROM posts';
@@ -268,7 +310,7 @@ initializeDatabase()
       }
     });
 
-    app.get('/api/posts/:id', async (req, res) => {
+    app.get('/api/posts/:id', checkDbReady, async (req, res) => {
       try {
         const { id } = req.params;
         const row = await dbGet(db, 'SELECT * FROM posts WHERE id = ?', [id]);
@@ -293,7 +335,7 @@ initializeDatabase()
       }
     });
 
-    app.post('/api/posts', upload.single('image'), async (req, res) => {
+    app.post('/api/posts', checkDbReady, upload.single('image'), async (req, res) => {
       try {
         const { title, content, type, categories, tags, author } = req.body;
         const image = req.file ? `/uploads/${req.file.filename}` : null;
@@ -322,7 +364,7 @@ initializeDatabase()
       }
     });
 
-    app.put('/api/posts/:id', upload.single('image'), async (req, res) => {
+    app.put('/api/posts/:id', checkDbReady, upload.single('image'), async (req, res) => {
       try {
         const { id } = req.params;
         const { title, content, type, categories, tags, author } = req.body;
@@ -375,7 +417,7 @@ initializeDatabase()
       }
     });
 
-    app.delete('/api/posts/:id', async (req, res) => {
+    app.delete('/api/posts/:id', checkDbReady, async (req, res) => {
       try {
         const { id } = req.params;
         const row = await dbGet(db, 'SELECT image FROM posts WHERE id = ?', [id]);
@@ -405,7 +447,7 @@ initializeDatabase()
       }
     });
 
-    app.post('/api/posts/:id/like', async (req, res) => {
+    app.post('/api/posts/:id/like', checkDbReady, async (req, res) => {
       try {
         const { id } = req.params;
         const row = await dbGet(db, 'SELECT likes FROM posts WHERE id = ?', [id]);
@@ -421,7 +463,7 @@ initializeDatabase()
       }
     });
 
-    app.post('/api/posts/:id/unlike', async (req, res) => {
+    app.post('/api/posts/:id/unlike', checkDbReady, async (req, res) => {
       try {
         const { id } = req.params;
         const row = await dbGet(db, 'SELECT likes FROM posts WHERE id = ?', [id]);
@@ -437,7 +479,7 @@ initializeDatabase()
       }
     });
 
-    app.post('/api/posts/:id/comment', async (req, res) => {
+    app.post('/api/posts/:id/comment', checkDbReady, async (req, res) => {
       try {
         const { id } = req.params;
         const { content, author } = req.body;
