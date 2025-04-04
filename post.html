@@ -7,41 +7,101 @@
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="https://via.placeholder.com/32x32" sizes="32x32">
 </head>
 <body>
-    <!-- Header -->
     <header>
-        <div class="header-container">
-            <h1><a href="/">My Blog</a></h1>
-            <nav>
-                <ul>
-                    <li><a href="/">Blog</a></li>
-                    <li><a href="/news.html">News</a></li>
-                    <li><a href="/about.html">About</a></li>
-                    <li><a href="/contact.html">Contact</a></li>
-                    <li><a href="/login.html">Admin</a></li>
-                </ul>
-            </nav>
-        </div>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/news">News</a></li>
+                <li><a href="/about">About</a></li>
+                <li><a href="/contact">Contact</a></li>
+                <li><a href="/admin">Admin</a></li>
+            </ul>
+        </nav>
     </header>
-
-    <!-- Post Content -->
     <main>
-        <div class="container">
-            <section class="full-post" id="full-post">
-                <!-- Full post content will be dynamically inserted here -->
-            </section>
+        <div id="post-container"></div>
+        <div id="comments-section">
+            <h2>Comments</h2>
+            <div id="comments-list"></div>
+            <form id="comment-form">
+                <label for="comment-content">Add a Comment:</label>
+                <textarea id="comment-content" name="content" required></textarea>
+                <label for="comment-author">Your Name:</label>
+                <input type="text" id="comment-author" name="author" required>
+                <button type="submit">Submit Comment</button>
+            </form>
         </div>
     </main>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
 
-    <!-- Footer -->
-    <footer>
-        <div class="footer-container">
-            <p>© 2025 My Blog. All rights reserved.</p>
-        </div>
-    </footer>
+        if (postId) {
+            fetch(`/api/posts/${postId}`)
+                .then(res => res.json())
+                .then(post => {
+                    const container = document.getElementById('post-container');
+                    container.innerHTML = `
+                        <h1>${post.title}</h1>
+                        ${post.image ? `<img src="${post.image}" alt="${post.title}" style="max-width: 500px;">` : '<p>No image available</p>'}
+                        <p>${post.content}</p>
+                        <p><strong>Author:</strong> ${post.author}</p>
+                        <p><strong>Posted on:</strong> ${new Date(post.createdAt).toLocaleDateString()}</p>
+                        <p><strong>Likes:</strong> ${post.likes || 0}</p>
+                        <button onclick="likePost()">Like</button>
+                        <button onclick="unlikePost()">Unlike</button>
+                    `;
+                    displayComments(post.comments || []);
+                });
+        }
 
-    <!-- JavaScript -->
-    <script src="/js/script.js"></script>
+        function displayComments(comments) {
+            const commentsList = document.getElementById('comments-list');
+            commentsList.innerHTML = '';
+            comments.forEach(comment => {
+                const commentElement = document.createElement('div');
+                commentElement.innerHTML = `
+                    <p><strong>${comment.author}</strong> (${new Date(comment.createdAt).toLocaleDateString()}): ${comment.content}</p>
+                `;
+                commentsList.appendChild(commentElement);
+            });
+        }
+
+        document.getElementById('comment-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const content = document.getElementById('comment-content').value;
+            const author = document.getElementById('comment-author').value;
+
+            fetch(`/api/posts/${postId}/comment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, author })
+            })
+            .then(res => res.json())
+            .then(data => {
+                displayComments(data.comments);
+                document.getElementById('comment-form').reset();
+            });
+        });
+
+        function likePost() {
+            fetch(`/api/posts/${postId}/like`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    document.querySelector('#post-container p:nth-child(5)').innerHTML = `<strong>Likes:</strong> ${data.likes}`;
+                });
+        }
+
+        function unlikePost() {
+            fetch(`/api/posts/${postId}/unlike`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    document.querySelector('#post-container p:nth-child(5)').innerHTML = `<strong>Likes:</strong> ${data.likes}`;
+                });
+        }
+    </script>
 </body>
 </html>

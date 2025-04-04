@@ -3,6 +3,8 @@ const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,8 +14,34 @@ app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// Set up Multer for file uploads
+const uploadDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir); // Save to public/uploads/
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname)); // e.g., 123456789-image.jpg
+  }
+});
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed!'), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
 // SQLite Database Setup
-const db = new sqlite3.Database('database.sqlite', (err) => {
+const db = new sqlite3.Database('/opt/render/project/src/db/database.sqlite', (err) => {
   if (err) {
     console.error('Error connecting to SQLite:', err);
     return;
@@ -90,6 +118,14 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
               return;
             }
 
+            db.run("UPDATE posts SET image = NULL WHERE image LIKE 'http%'", (err) => {
+              if (err) {
+                console.error('Error updating image URLs:', err);
+              } else {
+                console.log('Cleared external image URLs from posts');
+              }
+            });
+
             // Step 3: Drop the old table
             db.run(`DROP TABLE posts`, (err) => {
               if (err) {
@@ -149,7 +185,7 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
       {
         title: 'Welcome to My Blog',
         content: 'This is my first blog post! I’m excited to share my thoughts and community updates with you.',
-        image: 'https://via.placeholder.com/300x200',
+        image: null, // No image for initial posts
         type: 'Blog',
         categories: JSON.stringify(['Welcome']),
         tags: JSON.stringify(['intro']),
@@ -158,7 +194,7 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
       {
         title: 'Community Festival Announced',
         content: 'Join us for the annual community festival on May 15th! There will be food, music, and fun activities for all ages.',
-        image: 'https://via.placeholder.com/300x150',
+        image: null, // No image for initial posts
         type: 'News',
         categories: JSON.stringify(['Events']),
         tags: JSON.stringify(['festival']),
@@ -188,7 +224,7 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
 
 // Serve frontend files
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/index.html', (req, res) => res.redirect('/')); // Added redirect
+app.get('/index.html', (req, res) => res.redirect('/'));
 app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
 app.get('/news.html', (req, res) => res.redirect('/news'));
 app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
@@ -257,9 +293,10 @@ app.get('/api/posts/:id', (req, res) => {
   });
 });
 
-// Create a post
-app.post('/api/posts', (req, res) => {
-  const { title, content, image, type, categories, tags, author } = req.body;
+// Create a post with file upload
+app.post('/api/posts', upload.single('image'), (req, res) => {
+  const { title, content, type, categories, tags, author } = req.body;
+  const image = req.file ? `/uploads/${req.file.filename}` : null;
 
   // Convert categories and tags to arrays if they’re strings
   const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
@@ -272,7 +309,7 @@ app.post('/api/posts', (req, res) => {
   const params = [
     title,
     content,
-    image || null,
+    image,
     type,
     JSON.stringify(categoriesArray),
     JSON.stringify(tagsArray),
@@ -283,60 +320,104 @@ app.post('/api/posts', (req, res) => {
       res.status(500).json({ error: err.message });
       return;
     }
-    res.status(201).json({ id: this.lastID, ...req.body, image, createdAt: new Date().toISOString() });
+    res.status(201).json({ id: this.lastID, title, content, image, type, categories: categoriesArray, tags: tagsArray, author, createdAt: new Date().toISOString() });
   });
 });
 
-// Update a post
-app.put('/api/posts/:id', (req, res) => {
+// Update a post with file upload
+app.put('/api/posts/:id', upload.single('image'), (req, res) => {
   const { id } = req.params;
-  const { title, content, image, type, categories, tags, author } = req.body;
-
-  // Convert categories and tags to arrays if they’re strings
-  const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
-  const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
-
-  const query = `
-    UPDATE posts
-    SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
-    WHERE id = ?
-  `;
-  const params = [
-    title,
-    content,
-    image,
-    type,
-    JSON.stringify(categoriesArray),
-    JSON.stringify(tagsArray),
-    author || 'Jane Doe',
-    id
-  ];
-  db.run(query, params, function (err) {
+  const { title, content, type, categories, tags, author } = req.body;
+  
+  // Get the existing post to retrieve the current image path
+  db.get('SELECT image FROM posts WHERE id = ?', [id], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    if (this.changes === 0) {
+    if (!row) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    res.json({ id, title, content, image, type, categories: categoriesArray, tags: tagsArray, author });
+
+    // If a new image is uploaded, delete the old one (if it exists)
+    const oldImage = row.image;
+    const image = req.file ? `/uploads/${req.file.filename}` : oldImage;
+
+    if (req.file && oldImage && oldImage.startsWith('/uploads/')) {
+      const oldImagePath = path.join(__dirname, 'public.ConcurrentModificationException', oldImage);
+      fs.unlink(oldImagePath, (err) => {
+        if (err) console.error('Error deleting old image:', err);
+      });
+    }
+
+    // Convert categories and tags to arrays if they’re strings
+    const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
+    const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
+
+    const query = `
+      UPDATE posts
+      SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
+      WHERE id = ?
+    `;
+    const params = [
+      title,
+      content,
+      image,
+      type,
+      JSON.stringify(categoriesArray),
+      JSON.stringify(tagsArray),
+      author || 'Jane Doe',
+      id
+    ];
+    db.run(query, params, function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(404).json({ error: 'Post not found' });
+        return;
+      }
+      res.json({ id, title, content, image, type, categories: categoriesArray, tags: tagsArray, author });
+    });
   });
 });
 
 // Delete a post
 app.delete('/api/posts/:id', (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM posts WHERE id = ?', [id], function (err) {
+  // Get the post to retrieve the image path
+  db.get('SELECT image FROM posts WHERE id = ?', [id], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    if (this.changes === 0) {
+    if (!row) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    res.json({ message: 'Post deleted' });
+
+    // Delete the image file if it exists
+    const image = row.image;
+    if (image && image.startsWith('/uploads/')) {
+      const imagePath = path.join(__dirname, 'public', image);
+      fs.unlink(imagePath, (err) => {
+        if (err) console.error('Error deleting image:', err);
+      });
+    }
+
+    db.run('DELETE FROM posts WHERE id = ?', [id], function (err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(404).json({ error: 'Post not found' });
+        return;
+      }
+      res.json({ message: 'Post deleted' });
+    });
   });
 });
 
