@@ -21,22 +21,101 @@ const db = new sqlite3.Database('database.sqlite', (err) => {
   console.log('Connected to SQLite database');
 });
 
-// Create posts table if it doesn't exist
-db.run(`
-  CREATE TABLE IF NOT EXISTS posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    image TEXT,
-    type TEXT NOT NULL,
-    categories TEXT,
-    tags TEXT,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-    author TEXT DEFAULT 'Jane Doe',
-    likes INTEGER DEFAULT 0,
-    comments TEXT DEFAULT '[]'
-  )
-`);
+// Check if the posts table exists and migrate if necessary
+db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (err, row) => {
+  if (err) {
+    console.error('Error checking for posts table:', err);
+    return;
+  }
+
+  if (row) {
+    // Check if the image column exists
+    db.get("PRAGMA table_info(posts)", (err, columns) => {
+      if (err) {
+        console.error('Error checking table schema:', err);
+        return;
+      }
+
+      const hasImageColumn = columns.some(col => col.name === 'image');
+      if (!hasImageColumn) {
+        console.log('Migrating posts table to add image column...');
+        // Step 1: Create a new table with the image column
+        db.run(`
+          CREATE TABLE posts_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            image TEXT,
+            type TEXT NOT NULL,
+            categories TEXT,
+            tags TEXT,
+            createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+            author TEXT DEFAULT 'Jane Doe',
+            likes INTEGER DEFAULT 0,
+            comments TEXT DEFAULT '[]'
+          )
+        `, (err) => {
+          if (err) {
+            console.error('Error creating posts_new table:', err);
+            return;
+          }
+
+          // Step 2: Copy data from the old table to the new table (image will be NULL for existing rows)
+          db.run(`
+            INSERT INTO posts_new (id, title, content, type, categories, tags, createdAt, author, likes, comments)
+            SELECT id, title, content, type, categories, tags, createdAt, author, likes, comments
+            FROM posts
+          `, (err) => {
+            if (err) {
+              console.error('Error copying data to posts_new:', err);
+              return;
+            }
+
+            // Step 3: Drop the old table
+            db.run(`DROP TABLE posts`, (err) => {
+              if (err) {
+                console.error('Error dropping old posts table:', err);
+                return;
+              }
+
+              // Step 4: Rename the new table to posts
+              db.run(`ALTER TABLE posts_new RENAME TO posts`, (err) => {
+                if (err) {
+                  console.error('Error renaming posts_new to posts:', err);
+                  return;
+                }
+                console.log('Successfully migrated posts table with image column');
+              });
+            });
+          });
+        });
+      }
+    });
+  } else {
+    // If the posts table doesn't exist, create it with the correct schema
+    db.run(`
+      CREATE TABLE posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        image TEXT,
+        type TEXT NOT NULL,
+        categories TEXT,
+        tags TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        author TEXT DEFAULT 'Jane Doe',
+        likes INTEGER DEFAULT 0,
+        comments TEXT DEFAULT '[]'
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Error creating posts table:', err);
+        return;
+      }
+      console.log('Created posts table');
+    });
+  }
+});
 
 // Seed initial data if the database is empty
 db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
