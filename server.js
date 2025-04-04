@@ -88,21 +88,21 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
 
 // Serve frontend files
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/index.html', (req, res) => res.redirect('/')); // Add redirect
 app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
-app.get('/news.html', (req, res) => res.redirect('/news')); // Added redirect
+app.get('/news.html', (req, res) => res.redirect('/news')); // Add redirect
 app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
-app.get('/post.html', (req, res) => res.redirect('/post')); // Added redirect
+app.get('/post.html', (req, res) => res.redirect('/post')); // Add redirect
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'about.html')));
-app.get('/about.html', (req, res) => res.redirect('/about')); // Added redirect
+app.get('/about.html', (req, res) => res.redirect('/about')); // Add redirect
 app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'contact.html')));
-app.get('/contact.html', (req, res) => res.redirect('/contact')); // Added redirect
+app.get('/contact.html', (req, res) => res.redirect('/contact')); // Add redirect
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/admin.html', (req, res) => res.redirect('/admin')); // Added redirect
+app.get('/admin.html', (req, res) => res.redirect('/admin')); // Add redirect
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-app.get('/login.html', (req, res) => res.redirect('/login')); // Added redirect
+app.get('/login.html', (req, res) => res.redirect('/login')); // Add redirect
 
 // API Routes
-// Get all posts
 app.get('/api/posts', (req, res) => {
   const { type } = req.query;
   const query = type ? 'SELECT * FROM posts WHERE type = ?' : 'SELECT * FROM posts';
@@ -121,7 +121,6 @@ app.get('/api/posts', (req, res) => {
   });
 });
 
-// Get a single post by ID
 app.get('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   db.get('SELECT * FROM posts WHERE id = ?', [id], (err, row) => {
@@ -140,7 +139,6 @@ app.get('/api/posts/:id', (req, res) => {
   });
 });
 
-// Create a post
 app.post('/api/posts', (req, res) => {
   const { title, content, image, type, categories, tags, author } = req.body;
   const query = `
@@ -165,7 +163,6 @@ app.post('/api/posts', (req, res) => {
   });
 });
 
-// Update a post
 app.put('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   const { title, content, image, type, categories, tags, author } = req.body;
@@ -197,7 +194,6 @@ app.put('/api/posts/:id', (req, res) => {
   });
 });
 
-// Delete a post
 app.delete('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM posts WHERE id = ?', [id], function (err) {
@@ -213,7 +209,6 @@ app.delete('/api/posts/:id', (req, res) => {
   });
 });
 
-// Like a post
 app.post('/api/posts/:id/like', (req, res) => {
   const { id } = req.params;
   db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
@@ -236,7 +231,6 @@ app.post('/api/posts/:id/like', (req, res) => {
   });
 });
 
-// Unlike a post
 app.post('/api/posts/:id/unlike', (req, res) => {
   const { id } = req.params;
   db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
@@ -259,7 +253,6 @@ app.post('/api/posts/:id/unlike', (req, res) => {
   });
 });
 
-// Add a comment
 app.post('/api/posts/:id/comment', (req, res) => {
   const { id } = req.params;
   const { content, author } = req.body;
