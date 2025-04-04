@@ -44,7 +44,6 @@ const dbPath = path.join(dbDir, 'database.sqlite');
 let db;
 
 try {
-  // Check if the directory is accessible
   fs.accessSync(dbDir, fs.constants.W_OK);
   console.log(`Directory ${dbDir} is writable`);
   
@@ -67,162 +66,166 @@ try {
   });
 }
 
-// Check if the posts table exists and migrate if necessary
-db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (err, row) => {
-  if (err) {
-    console.error('Error checking for posts table:', err);
-    return;
-  }
+// Ensure database operations run sequentially
+db.serialize(() => {
+  // Check if the posts table exists and migrate if necessary
+  db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (err, row) => {
+    if (err) {
+      console.error('Error checking for posts table:', err);
+      return;
+    }
 
-  if (row) {
-    db.all("PRAGMA table_info(posts)", (err, columns) => {
-      if (err) {
-        console.error('Error checking table schema:', err);
-        return;
-      }
+    if (row) {
+      db.all("PRAGMA table_info(posts)", (err, columns) => {
+        if (err) {
+          console.error('Error checking table schema:', err);
+          return;
+        }
 
-      const hasImageColumn = Array.isArray(columns) && columns.some(col => col.name === 'image');
-      const hasTypeColumn = Array.isArray(columns) && columns.some(col => col.name === 'type');
+        const hasImageColumn = Array.isArray(columns) && columns.some(col => col.name === 'image');
+        const hasTypeColumn = Array.isArray(columns) && columns.some(col => col.name === 'type');
 
-      if (!hasImageColumn || !hasTypeColumn) {
-        console.log('Migrating posts table to add missing columns (image and/or type)...');
-        db.run(`
-          CREATE TABLE posts_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            image TEXT,
-            type TEXT NOT NULL,
-            categories TEXT,
-            tags TEXT,
-            createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-            author TEXT DEFAULT 'Jane Doe',
-            likes INTEGER DEFAULT 0,
-            comments TEXT DEFAULT '[]'
-          )
-        `, (err) => {
-          if (err) {
-            console.error('Error creating posts_new table:', err);
-            return;
-          }
-
-          const existingColumns = columns.map(col => col.name);
-          const targetColumns = ['id', 'title', 'content', 'type', 'categories', 'tags', 'createdAt', 'author', 'likes', 'comments'];
-          const selectColumns = targetColumns.map(col => {
-            if (existingColumns.includes(col)) {
-              return col;
-            } else if (col === 'type') {
-              return "'Blog' AS type";
-            } else if (col === 'image') {
-              return "NULL AS image";
-            } else {
-              return `'' AS ${col}`;
-            }
-          });
-
-          const insertQuery = `
-            INSERT INTO posts_new (${targetColumns.join(', ')})
-            SELECT ${selectColumns.join(', ')}
-            FROM posts
-          `;
-
-          db.run(insertQuery, (err) => {
+        if (!hasImageColumn || !hasTypeColumn) {
+          console.log('Migrating posts table to add missing columns (image and/or type)...');
+          db.run(`
+            CREATE TABLE posts_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              content TEXT NOT NULL,
+              image TEXT,
+              type TEXT NOT NULL,
+              categories TEXT,
+              tags TEXT,
+              createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+              author TEXT DEFAULT 'Jane Doe',
+              likes INTEGER DEFAULT 0,
+              comments TEXT DEFAULT '[]'
+            )
+          `, (err) => {
             if (err) {
-              console.error('Error copying data to posts_new:', err);
+              console.error('Error creating posts_new table:', err);
               return;
             }
 
-            db.run(`DROP TABLE posts`, (err) => {
+            const existingColumns = columns.map(col => col.name);
+            const targetColumns = ['id', 'title', 'content', 'type', 'categories', 'tags', 'createdAt', 'author', 'likes', 'comments'];
+            const selectColumns = targetColumns.map(col => {
+              if (existingColumns.includes(col)) {
+                return col;
+              } else if (col === 'type') {
+                return "'Blog' AS type";
+              } else if (col === 'image') {
+                return "NULL AS image";
+              } else {
+                return `'' AS ${col}`;
+              }
+            });
+
+            const insertQuery = `
+              INSERT INTO posts_new (${targetColumns.join(', ')})
+              SELECT ${selectColumns.join(', ')}
+              FROM posts
+            `;
+
+            db.run(insertQuery, (err) => {
               if (err) {
-                console.error('Error dropping old posts table:', err);
+                console.error('Error copying data to posts_new:', err);
                 return;
               }
 
-              db.run(`ALTER TABLE posts_new RENAME TO posts`, (err) => {
+              db.run(`DROP TABLE posts`, (err) => {
                 if (err) {
-                  console.error('Error renaming posts_new to posts:', err);
+                  console.error('Error dropping old posts table:', err);
                   return;
                 }
-                console.log('Successfully migrated posts table with missing columns');
+
+                db.run(`ALTER TABLE posts_new RENAME TO posts`, (err) => {
+                  if (err) {
+                    console.error('Error renaming posts_new to posts:', err);
+                    return;
+                  }
+                  console.log('Successfully migrated posts table with missing columns');
+                });
               });
             });
           });
-        });
-      } else {
-        console.log('All required columns (image, type) already exist in posts table');
-      }
-    });
-  } else {
-    db.run(`
-      CREATE TABLE posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        image TEXT,
-        type TEXT NOT NULL,
-        categories TEXT,
-        tags TEXT,
-        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-        author TEXT DEFAULT 'Jane Doe',
-        likes INTEGER DEFAULT 0,
-        comments TEXT DEFAULT '[]'
-      )
-    `, (err) => {
-      if (err) {
-        console.error('Error creating posts table:', err);
-        return;
-      }
-      console.log('Created posts table');
-    });
-  }
-});
-
-// Seed initial data if the database is empty
-db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
-  if (err) {
-    console.error('Error checking posts:', err);
-    return;
-  }
-  if (row.count === 0) {
-    const initialPosts = [
-      {
-        title: 'Welcome to My Blog',
-        content: 'This is my first blog post! I’m excited to share my thoughts and community updates with you.',
-        image: null,
-        type: 'Blog',
-        categories: JSON.stringify(['Welcome']),
-        tags: JSON.stringify(['intro']),
-        author: 'Jane Doe'
-      },
-      {
-        title: 'Community Festival Announced',
-        content: 'Join us for the annual community festival on May 15th! There will be food, music, and fun activities for all ages.',
-        image: null,
-        type: 'News',
-        categories: JSON.stringify(['Events']),
-        tags: JSON.stringify(['festival']),
-        author: 'Jane Doe'
-      }
-    ];
-    const query = `
-      INSERT INTO posts (title, content, image, type, categories, tags, author)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-    initialPosts.forEach(post => {
-      db.run(query, [
-        post.title,
-        post.content,
-        post.image,
-        post.type,
-        post.categories,
-        post.tags,
-        post.author
-      ], (err) => {
-        if (err) console.error('Error seeding post:', err);
+        } else {
+          console.log('All required columns (image, type) already exist in posts table');
+        }
       });
-    });
-    console.log('Seeded initial posts');
-  }
+    } else {
+      db.run(`
+        CREATE TABLE posts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          image TEXT,
+          type TEXT NOT NULL,
+          categories TEXT,
+          tags TEXT,
+          createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+          author TEXT DEFAULT 'Jane Doe',
+          likes INTEGER DEFAULT 0,
+          comments TEXT DEFAULT '[]'
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating posts table:', err);
+          return;
+        }
+        console.log('Created posts table');
+      });
+    }
+  });
+
+  // Seed initial data if the database is empty
+  db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
+    if (err) {
+      console.error('Error checking posts:', err);
+      // If the table doesn't exist yet, this is expected; proceed with seeding after creation
+      return;
+    }
+    if (row && row.count === 0) {
+      const initialPosts = [
+        {
+          title: 'Welcome to My Blog',
+          content: 'This is my first blog post! I’m excited to share my thoughts and community updates with you.',
+          image: null,
+          type: 'Blog',
+          categories: JSON.stringify(['Welcome']),
+          tags: JSON.stringify(['intro']),
+          author: 'Jane Doe'
+        },
+        {
+          title: 'Community Festival Announced',
+          content: 'Join us for the annual community festival on May 15th! There will be food, music, and fun activities for all ages.',
+          image: null,
+          type: 'News',
+          categories: JSON.stringify(['Events']),
+          tags: JSON.stringify(['festival']),
+          author: 'Jane Doe'
+        }
+      ];
+      const query = `
+        INSERT INTO posts (title, content, image, type, categories, tags, author)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+      initialPosts.forEach(post => {
+        db.run(query, [
+          post.title,
+          post.content,
+          post.image,
+          post.type,
+          post.categories,
+          post.tags,
+          post.author
+        ], (err) => {
+          if (err) console.error('Error seeding post:', err);
+        });
+      });
+      console.log('Seeded initial posts');
+    }
+  });
 });
 
 // Serve frontend files
