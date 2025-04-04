@@ -89,11 +89,17 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
 // Serve frontend files
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
+app.get('/news.html', (req, res) => res.redirect('/news')); // Added redirect
 app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
+app.get('/post.html', (req, res) => res.redirect('/post')); // Added redirect
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'about.html')));
+app.get('/about.html', (req, res) => res.redirect('/about')); // Added redirect
 app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'contact.html')));
+app.get('/contact.html', (req, res) => res.redirect('/contact')); // Added redirect
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/admin.html', (req, res) => res.redirect('/admin')); // Added redirect
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get('/login.html', (req, res) => res.redirect('/login')); // Added redirect
 
 // API Routes
 // Get all posts
@@ -276,6 +282,12 @@ app.post('/api/posts/:id/comment', (req, res) => {
       res.json({ id, comments });
     });
   });
+});
+
+// Catch-all route for debugging
+app.get('*', (req, res) => {
+  console.log(`Requested path: ${req.path}`);
+  res.status(404).send(`Cannot GET ${req.path}`);
 });
 
 // Start Server
