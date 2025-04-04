@@ -88,21 +88,21 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
 
 // Serve frontend files
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/index.html', (req, res) => res.redirect('/')); // Add redirect
 app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
-app.get('/news.html', (req, res) => res.redirect('/news')); // Add redirect
+app.get('/news.html', (req, res) => res.redirect('/news'));
 app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
-app.get('/post.html', (req, res) => res.redirect('/post')); // Add redirect
+app.get('/post.html', (req, res) => res.redirect('/post'));
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'about.html')));
-app.get('/about.html', (req, res) => res.redirect('/about')); // Add redirect
+app.get('/about.html', (req, res) => res.redirect('/about'));
 app.get('/contact', (req, res) => res.sendFile(path.join(__dirname, 'contact.html')));
-app.get('/contact.html', (req, res) => res.redirect('/contact')); // Add redirect
+app.get('/contact.html', (req, res) => res.redirect('/contact'));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/admin.html', (req, res) => res.redirect('/admin')); // Add redirect
+app.get('/admin.html', (req, res) => res.redirect('/admin'));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-app.get('/login.html', (req, res) => res.redirect('/login')); // Add redirect
+app.get('/login.html', (req, res) => res.redirect('/login'));
 
 // API Routes
+// Get all posts
 app.get('/api/posts', (req, res) => {
   const { type } = req.query;
   const query = type ? 'SELECT * FROM posts WHERE type = ?' : 'SELECT * FROM posts';
@@ -113,14 +113,23 @@ app.get('/api/posts', (req, res) => {
       return;
     }
     rows.forEach(row => {
-      row.categories = row.categories ? JSON.parse(row.categories) : [];
-      row.tags = row.tags ? JSON.parse(row.tags) : [];
+      try {
+        row.categories = row.categories ? JSON.parse(row.categories) : [];
+      } catch (e) {
+        row.categories = row.categories ? [row.categories] : [];
+      }
+      try {
+        row.tags = row.tags ? JSON.parse(row.tags) : [];
+      } catch (e) {
+        row.tags = row.tags ? [row.tags] : [];
+      }
       row.comments = row.comments ? JSON.parse(row.comments) : [];
     });
     res.json(rows);
   });
 });
 
+// Get a single post by ID
 app.get('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   db.get('SELECT * FROM posts WHERE id = ?', [id], (err, row) => {
@@ -132,15 +141,29 @@ app.get('/api/posts/:id', (req, res) => {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    row.categories = row.categories ? JSON.parse(row.categories) : [];
-    row.tags = row.tags ? JSON.parse(row.tags) : [];
+    try {
+      row.categories = row.categories ? JSON.parse(row.categories) : [];
+    } catch (e) {
+      row.categories = row.categories ? [row.categories] : [];
+    }
+    try {
+      row.tags = row.tags ? JSON.parse(row.tags) : [];
+    } catch (e) {
+      row.tags = row.tags ? [row.tags] : [];
+    }
     row.comments = row.comments ? JSON.parse(row.comments) : [];
     res.json(row);
   });
 });
 
+// Create a post
 app.post('/api/posts', (req, res) => {
   const { title, content, image, type, categories, tags, author } = req.body;
+
+  // Convert categories and tags to arrays if they’re strings
+  const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
+  const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
+
   const query = `
     INSERT INTO posts (title, content, image, type, categories, tags, author)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -150,8 +173,8 @@ app.post('/api/posts', (req, res) => {
     content,
     image || null,
     type,
-    JSON.stringify(categories ? JSON.parse(categories) : []),
-    JSON.stringify(tags ? JSON.parse(tags) : []),
+    JSON.stringify(categoriesArray),
+    JSON.stringify(tagsArray),
     author || 'Jane Doe'
   ];
   db.run(query, params, function (err) {
@@ -163,9 +186,15 @@ app.post('/api/posts', (req, res) => {
   });
 });
 
+// Update a post
 app.put('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   const { title, content, image, type, categories, tags, author } = req.body;
+
+  // Convert categories and tags to arrays if they’re strings
+  const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
+  const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
+
   const query = `
     UPDATE posts
     SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
@@ -176,8 +205,8 @@ app.put('/api/posts/:id', (req, res) => {
     content,
     image,
     type,
-    JSON.stringify(categories ? JSON.parse(categories) : []),
-    JSON.stringify(tags ? JSON.parse(tags) : []),
+    JSON.stringify(categoriesArray),
+    JSON.stringify(tagsArray),
     author || 'Jane Doe',
     id
   ];
@@ -190,10 +219,11 @@ app.put('/api/posts/:id', (req, res) => {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    res.json({ id, title, content, image, type, categories, tags, author });
+    res.json({ id, title, content, image, type, categories: categoriesArray, tags: tagsArray, author });
   });
 });
 
+// Delete a post
 app.delete('/api/posts/:id', (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM posts WHERE id = ?', [id], function (err) {
@@ -209,6 +239,7 @@ app.delete('/api/posts/:id', (req, res) => {
   });
 });
 
+// Like a post
 app.post('/api/posts/:id/like', (req, res) => {
   const { id } = req.params;
   db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
@@ -231,6 +262,7 @@ app.post('/api/posts/:id/like', (req, res) => {
   });
 });
 
+// Unlike a post
 app.post('/api/posts/:id/unlike', (req, res) => {
   const { id } = req.params;
   db.get('SELECT likes FROM posts WHERE id = ?', [id], (err, row) => {
@@ -253,6 +285,7 @@ app.post('/api/posts/:id/unlike', (req, res) => {
   });
 });
 
+// Add a comment
 app.post('/api/posts/:id/comment', (req, res) => {
   const { id } = req.params;
   const { content, author } = req.body;
