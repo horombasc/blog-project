@@ -11,22 +11,19 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.static('public'));
-app.use('/uploads', express.static('/uploads')); // Serve uploaded images directly
+app.use('/uploads', express.static('/uploads'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Set up Multer for file uploads
-const uploadDir = '/uploads'; // New Render Disk mount path
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const uploadDir = '/uploads';
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadDir); // Save to /uploads/
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname)); // e.g., 123456789-image.jpg
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 const upload = multer({
@@ -38,17 +35,11 @@ const upload = multer({
       cb(new Error('Only images are allowed!'), false);
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Ensure the database directory exists
-const dbDir = '/db'; // New Render Disk mount path
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-  console.log('Created database directory:', dbDir);
-}
-
 // SQLite Database Setup
+const dbDir = '/db';
 const dbPath = path.join(dbDir, 'database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -66,7 +57,6 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
   }
 
   if (row) {
-    // Check the existing columns in the posts table
     db.all("PRAGMA table_info(posts)", (err, columns) => {
       if (err) {
         console.error('Error checking table schema:', err);
@@ -78,8 +68,6 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
 
       if (!hasImageColumn || !hasTypeColumn) {
         console.log('Migrating posts table to add missing columns (image and/or type)...');
-
-        // Step 1: Create a new table with the full schema
         db.run(`
           CREATE TABLE posts_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,18 +88,17 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
             return;
           }
 
-          // Step 2: Build the migration query dynamically based on existing columns
           const existingColumns = columns.map(col => col.name);
           const targetColumns = ['id', 'title', 'content', 'type', 'categories', 'tags', 'createdAt', 'author', 'likes', 'comments'];
           const selectColumns = targetColumns.map(col => {
             if (existingColumns.includes(col)) {
-              return col; // Use the column if it exists
+              return col;
             } else if (col === 'type') {
-              return "'Blog' AS type"; // Default to 'Blog' if type is missing
+              return "'Blog' AS type";
             } else if (col === 'image') {
-              return "NULL AS image"; // Default to NULL if image is missing
+              return "NULL AS image";
             } else {
-              return `'' AS ${col}`; // Default to empty string for other missing columns
+              return `'' AS ${col}`;
             }
           });
 
@@ -127,14 +114,12 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
               return;
             }
 
-            // Step 3: Drop the old table
             db.run(`DROP TABLE posts`, (err) => {
               if (err) {
                 console.error('Error dropping old posts table:', err);
                 return;
               }
 
-              // Step 4: Rename the new table to posts
               db.run(`ALTER TABLE posts_new RENAME TO posts`, (err) => {
                 if (err) {
                   console.error('Error renaming posts_new to posts:', err);
@@ -150,7 +135,6 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
       }
     });
   } else {
-    // If the posts table doesn't exist, create it with the correct schema
     db.run(`
       CREATE TABLE posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,7 +244,7 @@ app.get('/api/posts', (req, res) => {
       } catch (e) {
         row.tags = row.tags ? [row.tags] : [];
       }
-      row.comments = row/comments ? JSON.parse(row.comments) : [];
+      row.comments = row.comments ? JSON.parse(row.comments) : [];
     });
     res.json(rows);
   });
@@ -293,65 +277,16 @@ app.get('/api/posts/:id', (req, res) => {
 });
 
 app.post('/api/posts', upload.single('image'), (req, res) => {
-  const { title, content, type, categories, tags, author } = req.body;
-  const image = req.file ? `/uploads/${req.file.filename}` : null;
-
-  const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
-  const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
-
-  const query = `
-    INSERT INTO posts (title, content, image, type, categories, tags, author)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-  const params = [
-    title,
-    content,
-    image,
-    type,
-    JSON.stringify(categoriesArray),
-    JSON.stringify(tagsArray),
-    author || 'Jane Doe'
-  ];
-  db.run(query, params, function (err) {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.status(201).json({ id: this.lastID, title, content, image, type, categories: categoriesArray, tags: tagsArray, author, createdAt: new Date().toISOString() });
-  });
-});
-
-app.put('/api/posts/:id', upload.single('image'), (req, res) => {
-  const { id } = req.params;
-  const { title, content, type, categories, tags, author } = req.body;
-  
-  db.get('SELECT image FROM posts WHERE id = ?', [id], (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    if (!row) {
-      res.status(404).json({ error: 'Post not found' });
-      return;
-    }
-
-    const oldImage = row.image;
-    const image = req.file ? `/uploads/${req.file.filename}` : oldImage;
-
-    if (req.file && oldImage && oldImage.startsWith('/uploads/')) {
-      const oldImagePath = path.join('/uploads', path.basename(oldImage));
-      fs.unlink(oldImagePath, (err) => {
-        if (err) console.error('Error deleting old image:', err);
-      });
-    }
+  try {
+    const { title, content, type, categories, tags, author } = req.body;
+    const image = req.file ? `/uploads/${req.file.filename}` : null;
 
     const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
     const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
 
     const query = `
-      UPDATE posts
-      SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
-      WHERE id = ?
+      INSERT INTO posts (title, content, image, type, categories, tags, author)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [
       title,
@@ -360,21 +295,80 @@ app.put('/api/posts/:id', upload.single('image'), (req, res) => {
       type,
       JSON.stringify(categoriesArray),
       JSON.stringify(tagsArray),
-      author || 'Jane Doe',
-      id
+      author || 'Jane Doe'
     ];
     db.run(query, params, function (err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      if (this.changes === 0) {
+      res.status(201).json({ id: this.lastID, title, content, image, type, categories: categoriesArray, tags: tagsArray, author, createdAt: new Date().toISOString() });
+    });
+  } catch (err) {
+    console.error('Error uploading file:', err);
+    res.status(500).json({ error: 'Failed to upload image. Please try again.' });
+  }
+});
+
+app.put('/api/posts/:id', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, type, categories, tags, author } = req.body;
+    
+    db.get('SELECT image FROM posts WHERE id = ?', [id], (err, row) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (!row) {
         res.status(404).json({ error: 'Post not found' });
         return;
       }
-      res.json({ id, title, content, image, type, categories: categoriesArray, tags: tagsArray, author });
+
+      const oldImage = row.image;
+      const image = req.file ? `/uploads/${req.file.filename}` : oldImage;
+
+      if (req.file && oldImage && oldImage.startsWith('/uploads/')) {
+        const oldImagePath = path.join('/uploads', path.basename(oldImage));
+        fs.unlink(oldImagePath, (err) => {
+          if (err) console.error('Error deleting old image:', err);
+        });
+      }
+
+      const categoriesArray = typeof categories === 'string' ? categories.split(',').map(item => item.trim()) : (Array.isArray(categories) ? categories : []);
+      const tagsArray = typeof tags === 'string' ? tags.split(',').map(item => item.trim()) : (Array.isArray(tags) ? tags : []);
+
+      const query = `
+        UPDATE posts
+        SET title = ?, content = ?, image = ?, type = ?, categories = ?, tags = ?, author = ?
+        WHERE id = ?
+      `;
+      const params = [
+        title,
+        content,
+        image,
+        type,
+        JSON.stringify(categoriesArray),
+        JSON.stringify(tagsArray),
+        author || 'Jane Doe',
+        id
+      ];
+      db.run(query, params, function (err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        if (this.changes === 0) {
+          res.status(404).json({ error: 'Post not found' });
+          return;
+        }
+        res.json({ id, title, content, image, type, categories: categoriesArray, tags: tagsArray, author });
+      });
     });
-  });
+  } catch (err) {
+    console.error('Error uploading file:', err);
+    res.status(500).json({ error: 'Failed to upload image. Please try again.' });
+  }
 });
 
 app.delete('/api/posts/:id', (req, res) => {
@@ -476,6 +470,15 @@ app.post('/api/posts/:id/comment', (req, res) => {
       }
       res.json({ id, comments });
     });
+  });
+});
+
+app.get('/download-db', (req, res) => {
+  res.download('/db/database.sqlite', 'database.sqlite', (err) => {
+    if (err) {
+      console.error('Error downloading database:', err);
+      res.status(500).send('Error downloading database');
+    }
   });
 });
 
