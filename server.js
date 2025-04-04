@@ -30,13 +30,13 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
 
   if (row) {
     // Check if the image column exists
-    db.get("PRAGMA table_info(posts)", (err, columns) => {
+    db.all("PRAGMA table_info(posts)", (err, columns) => {
       if (err) {
         console.error('Error checking table schema:', err);
         return;
       }
 
-      const hasImageColumn = columns.some(col => col.name === 'image');
+      const hasImageColumn = Array.isArray(columns) && columns.some(col => col.name === 'image');
       if (!hasImageColumn) {
         console.log('Migrating posts table to add image column...');
         // Step 1: Create a new table with the image column
@@ -89,6 +89,8 @@ db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'", (er
             });
           });
         });
+      } else {
+        console.log('Image column already exists in posts table');
       }
     });
   } else {
