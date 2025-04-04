@@ -188,6 +188,7 @@ db.get('SELECT COUNT(*) as count FROM posts', (err, row) => {
 
 // Serve frontend files
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/index.html', (req, res) => res.redirect('/')); // Added redirect
 app.get('/news', (req, res) => res.sendFile(path.join(__dirname, 'news.html')));
 app.get('/news.html', (req, res) => res.redirect('/news'));
 app.get('/post', (req, res) => res.sendFile(path.join(__dirname, 'post.html')));
